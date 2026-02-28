@@ -1,0 +1,10 @@
+# k6/http
+
+The HTTP module provides functionality for making HTTP requests.
+
+> **Note:** HTTP/2 is supported by default since k6 v0.55.x.
+
+
+---
+Subtopics: get, post, cookiejar, get
+Use: k6 x docs http <subtopic>

@@ -1,0 +1,4 @@
+- javascript-api  k6 JavaScript API reference.
+- using-k6        Learn how to use k6.
+- examples        Example k6 scripts.
+- testing-guides  Guides for various testing scenarios.

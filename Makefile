@@ -1,5 +1,6 @@
 K6_VERSION ?= latest
 K6_DOCS_PATH ?= ./k6-docs
+K6_BIN ?= ./k6
 
 .PHONY: help lint test build prepare
 
@@ -10,7 +11,7 @@ lint: ## Run linters
 	golangci-lint run ./...
 
 test: ## Run tests
-	go test -race -count=1 ./...
+	RUN_SMOKE_E2E=1 K6_BIN=$(K6_BIN) go test -race -count=1 ./...
 
 build: ## Build k6 with this extension
 	xk6 build --with github.com/grafana/xk6-subcommand-docs=.

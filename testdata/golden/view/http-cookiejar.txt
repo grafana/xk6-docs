@@ -1,0 +1,7 @@
+# CookieJar
+
+HTTP cookie jar for managing cookies between requests.
+
+---
+Subtopics: clear
+Use: k6 x docs http cookiejar <subtopic>

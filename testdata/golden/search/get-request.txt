@@ -1,0 +1,4 @@
+Results for "GET request":
+k6-http:
+- get  Make an HTTP GET request.
+

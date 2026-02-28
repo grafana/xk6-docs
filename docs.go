@@ -57,8 +57,9 @@ type listItem struct {
 }
 
 // printAlignedList prints items as a left-aligned name+description list.
-// Duplicate names (by Name) are skipped. Each line is indented by indent.
-func printAlignedList(w io.Writer, items []listItem, indent string) {
+// Duplicate names (by Name) are skipped.
+func printAlignedList(w io.Writer, items []listItem) {
+	const indent = "- "
 	seen := make(map[string]bool, len(items))
 
 	maxWidth := 0
@@ -111,7 +112,7 @@ func printTOC(w io.Writer, idx *Index, version string) {
 				Description: child.Description,
 			})
 		}
-		printAlignedList(w, items, "- ")
+		printAlignedList(w, items)
 		_, _ = fmt.Fprintf(w, "\n  → Usage: k6 x docs %s <topic>\n", cat.Slug)
 	}
 }
@@ -169,7 +170,7 @@ func printList(w io.Writer, idx *Index, slug string) {
 			Description: child.Description,
 		})
 	}
-	printAlignedList(w, items, "- ")
+	printAlignedList(w, items)
 }
 
 // printTopLevelList lists all top-level categories with their descriptions.
@@ -183,7 +184,7 @@ func printTopLevelList(w io.Writer, idx *Index) {
 			Description: cat.Description,
 		})
 	}
-	printAlignedList(w, items, "- ")
+	printAlignedList(w, items)
 }
 
 // searchGroupKey returns the grouping key for a search result.
@@ -277,7 +278,7 @@ func printSearch(afs fsext.Fs, w io.Writer, idx *Index, term, cacheDir, version 
 				Description: sec.Description,
 			})
 		}
-		printAlignedList(w, items, "- ")
+		printAlignedList(w, items)
 
 		_, _ = fmt.Fprintln(w)
 	}

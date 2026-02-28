@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -261,7 +264,7 @@ func TestRunWithMockDocs(t *testing.T) {
 	version := "v0.99.x"
 	outputDir := "/output"
 
-	if err := run(version, docsPath, outputDir, afs); err != nil {
+	if err := run(version, docsPath, outputDir, afs, io.Discard); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 
@@ -377,7 +380,7 @@ func TestTransformedMarkdownContent(t *testing.T) {
 	version := "v0.99.x"
 	outputDir := "/output-transformed"
 
-	if err := run(version, docsPath, outputDir, afs); err != nil {
+	if err := run(version, docsPath, outputDir, afs, io.Discard); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 
@@ -468,7 +471,7 @@ func TestBestPracticesWritten(t *testing.T) {
 	version := "v0.99.x"
 	outputDir := "/output-bestpractices"
 
-	if err := run(version, docsPath, outputDir, afs); err != nil {
+	if err := run(version, docsPath, outputDir, afs, io.Discard); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 
@@ -718,7 +721,7 @@ func TestSlugCollisionPrefersIndex(t *testing.T) {
 		"---\ntitle: 'set'\nweight: 1\n---\n\nSet a cookie.\n")
 
 	outputDir := "/output-collision"
-	if err := run(version, root, outputDir, afs); err != nil {
+	if err := run(version, root, outputDir, afs, io.Discard); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 
@@ -771,7 +774,7 @@ func TestRunWithRealDocs(t *testing.T) {
 	outputDir := filepath.Join(t.TempDir(), "real-output")
 	version := "v1.5.x"
 
-	if err := run(version, k6DocsPath, outputDir, afs); err != nil {
+	if err := run(version, k6DocsPath, outputDir, afs, io.Discard); err != nil {
 		t.Fatalf("run with real docs: %v", err)
 	}
 
@@ -830,7 +833,7 @@ func TestRunWithExactVersionNoVPrefix(t *testing.T) {
 	afs, docsPath := setupMockDocs(t)
 	outputDir := "/output-novprefix"
 
-	if err := run("0.99.3", docsPath, outputDir, afs); err != nil {
+	if err := run("0.99.3", docsPath, outputDir, afs, io.Discard); err != nil {
 		t.Fatalf("run with bare version (no v prefix): %v", err)
 	}
 
@@ -859,7 +862,7 @@ func TestMissingVersion(t *testing.T) {
 	afs, docsPath := setupMockDocs(t)
 	outputDir := "/output-missing"
 
-	err := run("v999.999.x", docsPath, outputDir, afs)
+	err := run("v999.999.x", docsPath, outputDir, afs, io.Discard)
 	if err == nil {
 		t.Fatal("expected error for missing version, got nil")
 	}
@@ -877,7 +880,7 @@ func TestRunWithExactVersion(t *testing.T) {
 	afs, docsPath := setupMockDocs(t)
 	outputDir := "/output-exact"
 
-	if err := run("v0.99.3", docsPath, outputDir, afs); err != nil {
+	if err := run("v0.99.3", docsPath, outputDir, afs, io.Discard); err != nil {
 		t.Fatalf("run with exact version: %v", err)
 	}
 
@@ -898,5 +901,44 @@ func TestRunWithExactVersion(t *testing.T) {
 
 	if len(idx.Sections) == 0 {
 		t.Error("expected sections to be populated")
+	}
+}
+
+func TestEnsureDocsRepoAutoClone(t *testing.T) {
+	t.Parallel()
+
+	// ensureDocsRepo clones from github.com/grafana/k6-docs when path is empty.
+	// This requires network access. Skip if no network.
+	afs := fsext.NewOsFs()
+	var stderr bytes.Buffer
+
+	path, cleanup, err := ensureDocsRepo("", afs, &stderr)
+	if err != nil {
+		// If clone fails (no network), skip rather than fail.
+		t.Skipf("ensureDocsRepo clone failed (no network?): %v", err)
+	}
+
+	// Verify it cloned something.
+	if path == "" {
+		t.Fatal("ensureDocsRepo returned empty path")
+	}
+
+	// Verify the cloned directory exists and has docs.
+	docsDir := filepath.Join(path, "docs")
+	if _, statErr := os.Stat(docsDir); statErr != nil {
+		t.Errorf("cloned repo missing docs/ directory: %v", statErr)
+	}
+
+	// Verify stderr mentions cloning.
+	if !strings.Contains(stderr.String(), "Cloning") {
+		t.Error("expected 'Cloning' in stderr output")
+	}
+
+	// Cleanup should remove the directory.
+	if cleanup != nil {
+		cleanup()
+	}
+	if _, statErr := os.Stat(path); statErr == nil {
+		t.Error("cleanup should have removed the cloned directory")
 	}
 }

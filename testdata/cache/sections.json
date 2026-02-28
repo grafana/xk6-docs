@@ -1,0 +1,145 @@
+{
+  "version": "v0.55.x",
+  "sections": [
+    {
+      "slug": "javascript-api",
+      "rel_path": "javascript-api/_index.md",
+      "title": "JavaScript API",
+      "description": "k6 JavaScript API reference.",
+      "weight": 1,
+      "category": "javascript-api",
+      "children": ["javascript-api/k6-http", "javascript-api/jslib", "javascript-api/k6-jslib"],
+      "is_index": true
+    },
+    {
+      "slug": "javascript-api/k6-http",
+      "rel_path": "javascript-api/k6-http/_index.md",
+      "title": "k6/http",
+      "description": "HTTP module for k6.",
+      "weight": 1,
+      "category": "javascript-api",
+      "children": ["javascript-api/k6-http/get", "javascript-api/k6-http/post", "javascript-api/k6-http/cookiejar", "javascript-api/k6-http/k6-http-get"],
+      "is_index": true
+    },
+    {
+      "slug": "javascript-api/k6-http/get",
+      "rel_path": "javascript-api/k6-http/get.md",
+      "title": "get",
+      "description": "Make an HTTP GET request.",
+      "weight": 1,
+      "category": "javascript-api",
+      "children": null,
+      "is_index": false
+    },
+    {
+      "slug": "javascript-api/k6-http/post",
+      "rel_path": "javascript-api/k6-http/post.md",
+      "title": "post",
+      "description": "Make an HTTP POST request.",
+      "weight": 2,
+      "category": "javascript-api",
+      "children": null,
+      "is_index": false
+    },
+    {
+      "slug": "javascript-api/k6-http/k6-http-get",
+      "rel_path": "javascript-api/k6-http/k6-http-get.md",
+      "title": "get (alternate)",
+      "description": "Alternate GET endpoint.",
+      "weight": 4,
+      "category": "javascript-api",
+      "children": null,
+      "is_index": false
+    },
+    {
+      "slug": "javascript-api/k6-http/cookiejar",
+      "rel_path": "javascript-api/k6-http/cookiejar/_index.md",
+      "title": "CookieJar",
+      "description": "HTTP cookie jar.",
+      "weight": 3,
+      "category": "javascript-api",
+      "children": ["javascript-api/k6-http/cookiejar/cookiejar-clear"],
+      "is_index": true
+    },
+    {
+      "slug": "javascript-api/k6-http/cookiejar/cookiejar-clear",
+      "rel_path": "javascript-api/k6-http/cookiejar/cookiejar-clear.md",
+      "title": "CookieJar.clear",
+      "description": "Clear all cookies.",
+      "weight": 1,
+      "category": "javascript-api",
+      "children": null,
+      "is_index": false
+    },
+    {
+      "slug": "javascript-api/jslib",
+      "rel_path": "javascript-api/jslib/_index.md",
+      "title": "jslib",
+      "description": "JavaScript utility library.",
+      "weight": 5,
+      "category": "javascript-api",
+      "children": null,
+      "is_index": true
+    },
+    {
+      "slug": "javascript-api/k6-jslib",
+      "rel_path": "javascript-api/k6-jslib/_index.md",
+      "title": "k6-jslib",
+      "description": "Extended JavaScript utility library.",
+      "weight": 6,
+      "category": "javascript-api",
+      "children": null,
+      "is_index": true
+    },
+    {
+      "slug": "using-k6",
+      "rel_path": "using-k6/_index.md",
+      "title": "Using k6",
+      "description": "Learn how to use k6.",
+      "weight": 2,
+      "category": "using-k6",
+      "children": ["using-k6/scenarios"],
+      "is_index": true
+    },
+    {
+      "slug": "using-k6/scenarios",
+      "rel_path": "using-k6/scenarios.md",
+      "title": "Scenarios",
+      "description": "Configure test scenarios.",
+      "weight": 1,
+      "category": "using-k6",
+      "children": null,
+      "is_index": false
+    },
+    {
+      "slug": "examples",
+      "rel_path": "examples/_index.md",
+      "title": "Examples",
+      "description": "Example k6 scripts.",
+      "weight": 3,
+      "category": "examples",
+      "children": ["examples/websockets"],
+      "is_index": true
+    },
+    {
+      "slug": "examples/websockets",
+      "rel_path": "examples/websockets.md",
+      "title": "WebSockets",
+      "description": "WebSocket load testing examples including real-time bidirectional communication patterns and analysis",
+      "weight": 1,
+      "category": "examples",
+      "children": null,
+      "is_index": false
+    },
+    {
+      "slug": "testing-guides",
+      "rel_path": "testing-guides/_index.md",
+      "title": "Testing Guides",
+      "description": "Guides for various testing scenarios.",
+      "weight": 4,
+      "category": "testing-guides",
+      "children": null,
+      "is_index": true
+    }
+  ]
+}

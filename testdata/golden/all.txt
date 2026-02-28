@@ -1,0 +1,69 @@
+k6 Documentation (v0.55.x)
+# JavaScript API
+
+The k6 JavaScript API reference documentation.
+
+# k6/http
+
+The HTTP module provides functionality for making HTTP requests.
+
+> **Note:** HTTP/2 is supported by default since k6 v0.55.x.
+
+
+## http.get(url, [params])
+
+Make an HTTP GET request.
+
+import http from 'k6/http';
+
+export default function () {
+  const res = http.get('https://test-api.k6.io/');
+}
+
+
+## http.post(url, [body], [params])
+
+Make an HTTP POST request.
+
+## http.get(url) [alternate]
+
+Alternate GET endpoint documentation.
+
+# CookieJar
+
+HTTP cookie jar for managing cookies between requests.
+
+## CookieJar.clear()
+
+Clears all cookies from the cookie jar.
+
+# jslib
+
+JavaScript utility library reference.
+
+# k6-jslib
+
+The k6-jslib module provides extended utilities for test scripting.
+
+# Using k6
+
+Guide to using k6 for load testing.
+
+# Scenarios
+
+Scenarios let you configure how your test executes.
+
+See the Scenarios documentation for details.
+
+# Examples
+
+Example k6 scripts for common use cases.
+
+# WebSockets
+
+WebSocket example content for load testing.
+
+# Testing Guides
+
+Guides for various testing scenarios.
+

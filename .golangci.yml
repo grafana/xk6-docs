@@ -93,6 +93,7 @@ linters:
           - canonicalheader
           - cyclop
           - dupl
+          - forbidigo
           - forcetypeassert
           - funlen
           - gocognit

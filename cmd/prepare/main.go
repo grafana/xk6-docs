@@ -8,6 +8,7 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	_ "embed"
 	"encoding/json"
 	"errors"
@@ -16,7 +17,6 @@ import (
 	"io"
 	"io/fs"
 	"log"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -53,15 +53,17 @@ func main() {
 	}
 
 	afs := fsext.NewOsFs()
-	if err := run(k6Version, k6DocsPath, outputDir, afs); err != nil {
+	if err := run(k6Version, k6DocsPath, outputDir, afs, log.Writer()); err != nil {
 		log.Fatal(err)
 	}
 }
 
-//nolint:forbidigo
-func run(k6Version, k6DocsPath, outputDir string, afs fsext.Fs) error {
+func run(
+	k6Version, k6DocsPath, outputDir string,
+	afs fsext.Fs, stderr io.Writer,
+) error {
 	// Step 1: ensure we have the k6-docs repo.
-	docsPath, cleanup, err := ensureDocsRepo(k6DocsPath, afs, os.Stderr, os.MkdirTemp)
+	docsPath, cleanup, err := ensureDocsRepo(k6DocsPath, afs, stderr)
 	if err != nil {
 		return err
 	}
@@ -107,23 +109,20 @@ func run(k6Version, k6DocsPath, outputDir string, afs fsext.Fs) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintln(os.Stderr, "Done: sections written")
+	_, _ = fmt.Fprintln(stderr, "Done: sections written")
 	return nil
 }
 
 // ensureDocsRepo returns the path to the k6-docs repo. If k6DocsPath is empty,
 // it clones the repo into a temp directory and returns a cleanup function.
-// The mkTempDir and stderr parameters are injected from run() which is the
-// bootstrap entry point with os package access.
 func ensureDocsRepo(
 	k6DocsPath string, afs fsext.Fs, stderr io.Writer,
-	mkTempDir func(string, string) (string, error),
 ) (string, func(), error) {
 	if k6DocsPath != "" {
 		return k6DocsPath, nil, nil
 	}
 
-	tmpDir, err := mkTempDir("", "k6-docs-*")
+	tmpDir, err := mkTempDir(afs)
 	if err != nil {
 		return "", nil, fmt.Errorf("create temp dir: %w", err)
 	}
@@ -142,6 +141,18 @@ func ensureDocsRepo(
 
 	cleanup := func() { _ = afs.RemoveAll(tmpDir) }
 	return tmpDir, cleanup, nil
+}
+
+func mkTempDir(afs fsext.Fs) (string, error) {
+	var buf [8]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		return "", err
+	}
+	dir := filepath.Join("/tmp", fmt.Sprintf("k6-docs-%x", buf))
+	if err := afs.MkdirAll(dir, 0o750); err != nil {
+		return "", err
+	}
+	return dir, nil
 }
 
 // buildSharedContentMap reads all .md files under the shared directory and

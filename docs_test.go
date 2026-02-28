@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -23,8 +25,8 @@ func newTestGlobalState(t *testing.T, afs fsext.Fs) *state.GlobalState {
 }
 
 // setupTestCache creates an in-memory directory with sections.json and markdown files,
-// returning the filesystem, cache dir path, and a loaded Index.
-func setupTestCache(t *testing.T) (fsext.Fs, string, *Index) {
+// returning the filesystem and cache dir path.
+func setupTestCache(t *testing.T) (fsext.Fs, string) {
 	t.Helper()
 
 	afs := fsext.NewMemMapFs()
@@ -41,7 +43,7 @@ func setupTestCache(t *testing.T) (fsext.Fs, string, *Index) {
 			Description: "k6 JavaScript API reference.",
 			Weight:      1,
 			Category:    "javascript-api",
-			Children:    []string{"javascript-api/k6-http"},
+			Children:    []string{"javascript-api/k6-http", "javascript-api/jslib"},
 			IsIndex:     true,
 		},
 		{
@@ -51,7 +53,7 @@ func setupTestCache(t *testing.T) (fsext.Fs, string, *Index) {
 			Description: "HTTP module for k6.",
 			Weight:      1,
 			Category:    "javascript-api",
-			Children:    []string{"javascript-api/k6-http/get", "javascript-api/k6-http/post"},
+			Children:    []string{"javascript-api/k6-http/get", "javascript-api/k6-http/post", "javascript-api/k6-http/cookiejar", "javascript-api/k6-http/k6-http-get"},
 			IsIndex:     true,
 		},
 		{
@@ -73,6 +75,49 @@ func setupTestCache(t *testing.T) (fsext.Fs, string, *Index) {
 			Category:    "javascript-api",
 			Children:    nil,
 			IsIndex:     false,
+		},
+		{
+			// k6-http-get's childName resolves to "get" (same as the existing get child)
+			// because childName strips the parent prefix "k6-http-".
+			// This triggers deduplication in printAlignedList.
+			Slug:        "javascript-api/k6-http/k6-http-get",
+			RelPath:     "javascript-api/k6-http/k6-http-get.md",
+			Title:       "get (alternate)",
+			Description: "Alternate GET endpoint.",
+			Weight:      4,
+			Category:    "javascript-api",
+			Children:    nil,
+			IsIndex:     false,
+		},
+		{
+			Slug:        "javascript-api/k6-http/cookiejar",
+			RelPath:     "javascript-api/k6-http/cookiejar/_index.md",
+			Title:       "CookieJar",
+			Description: "HTTP cookie jar.",
+			Weight:      3,
+			Category:    "javascript-api",
+			Children:    []string{"javascript-api/k6-http/cookiejar/cookiejar-clear"},
+			IsIndex:     true,
+		},
+		{
+			Slug:        "javascript-api/k6-http/cookiejar/cookiejar-clear",
+			RelPath:     "javascript-api/k6-http/cookiejar/cookiejar-clear.md",
+			Title:       "CookieJar.clear",
+			Description: "Clear all cookies.",
+			Weight:      1,
+			Category:    "javascript-api",
+			Children:    nil,
+			IsIndex:     false,
+		},
+		{
+			Slug:        "javascript-api/jslib",
+			RelPath:     "javascript-api/jslib/_index.md",
+			Title:       "jslib",
+			Description: "JavaScript utility library.",
+			Weight:      5,
+			Category:    "javascript-api",
+			Children:    nil,
+			IsIndex:     true,
 		},
 		{
 			Slug:        "using-k6",
@@ -108,7 +153,7 @@ func setupTestCache(t *testing.T) (fsext.Fs, string, *Index) {
 			Slug:        "examples/websockets",
 			RelPath:     "examples/websockets.md",
 			Title:       "WebSockets",
-			Description: "WebSocket load testing examples.",
+			Description: "WebSocket load testing examples including real-time bidirectional communication patterns and analysis",
 			Weight:      1,
 			Category:    "examples",
 			Children:    nil,
@@ -133,14 +178,18 @@ func setupTestCache(t *testing.T) (fsext.Fs, string, *Index) {
 	// but frontmatter and other shortcodes still present), matching how the
 	// prepare command now generates cached content.
 	mdFiles := map[string]string{
-		"javascript-api/_index.md":         "---\ntitle: 'JavaScript API'\n---\n# JavaScript API\n\nThe JavaScript API reference.\n",
-		"javascript-api/k6-http/_index.md": "---\ntitle: 'k6/http'\n---\n# k6/http\n\nThe HTTP module.\n",
-		"javascript-api/k6-http/get.md":    "---\ntitle: 'get'\n---\n## http.get(url)\n\nMake a GET request.\n",
-		"javascript-api/k6-http/post.md":   "---\ntitle: 'post'\n---\n## http.post(url, body)\n\nMake a POST request.\n",
-		"using-k6/_index.md":               "---\ntitle: 'Using k6'\n---\n# Using k6\n\nGuide to using k6.\n",
-		"using-k6/scenarios.md":            "---\ntitle: 'Scenarios'\n---\n# Scenarios\n\nScenarios let you configure execution.\n",
-		"examples/_index.md":               "---\ntitle: 'Examples'\n---\n# Examples\n\nExample scripts.\n",
-		"examples/websockets.md":           "---\ntitle: 'WebSockets'\n---\n# WebSockets\n\nWebSocket example content.\n",
+		"javascript-api/_index.md":                            "---\ntitle: 'JavaScript API'\n---\n# JavaScript API\n\nThe JavaScript API reference.\n",
+		"javascript-api/k6-http/_index.md":                    "---\ntitle: 'k6/http'\n---\n# k6/http\n\nThe HTTP module.\n",
+		"javascript-api/jslib/_index.md":                      "---\ntitle: 'jslib'\n---\n# jslib\n\nJavaScript utility library reference.\n",
+		"javascript-api/k6-http/get.md":                       "---\ntitle: 'get'\n---\n## http.get(url)\n\nMake a GET request.\n",
+		"javascript-api/k6-http/post.md":                      "---\ntitle: 'post'\n---\n## http.post(url, body)\n\nMake a POST request.\n",
+		"javascript-api/k6-http/k6-http-get.md":               "---\ntitle: 'get (alternate)'\n---\n## http.get(url) [alternate]\n\nAlternate GET endpoint.\n",
+		"javascript-api/k6-http/cookiejar/_index.md":          "---\ntitle: 'CookieJar'\n---\n# CookieJar\n\nHTTP cookie jar reference.\n",
+		"javascript-api/k6-http/cookiejar/cookiejar-clear.md": "---\ntitle: 'CookieJar.clear'\n---\n## CookieJar.clear()\n\nClears all cookies.\n",
+		"using-k6/_index.md":                                  "---\ntitle: 'Using k6'\n---\n# Using k6\n\nGuide to using k6.\n",
+		"using-k6/scenarios.md":                               "---\ntitle: 'Scenarios'\n---\n# Scenarios\n\nScenarios let you configure execution.\n",
+		"examples/_index.md":                                  "---\ntitle: 'Examples'\n---\n# Examples\n\nExample scripts.\n",
+		"examples/websockets.md":                              "---\ntitle: 'WebSockets'\n---\n# WebSockets\n\nWebSocket example content.\n",
 	}
 
 	for relPath, content := range mdFiles {
@@ -159,641 +208,51 @@ func setupTestCache(t *testing.T) (fsext.Fs, string, *Index) {
 		t.Fatalf("write best_practices.md: %v", err)
 	}
 
-	// Reload from the in-memory FS so bySlug map is built.
-	idx, err = LoadIndex(afs, dir)
-	if err != nil {
+	// Reload from the in-memory FS so bySlug map is built (validates sections.json).
+	if _, err = LoadIndex(afs, dir); err != nil {
 		t.Fatalf("LoadIndex: %v", err)
 	}
 
-	return afs, dir, idx
+	return afs, dir
 }
 
-// checkAlignment verifies that all listing lines (starting with "- " or "  ")
-// in the given output have their descriptions starting at the same column.
-// It returns the column index and true if aligned, or 0 and false if not.
-func checkAlignment(t *testing.T, label, output string) {
+// setupTestdataCache copies testdata/cache/ from the real filesystem into an
+// in-memory MemMapFs, returning the filesystem and cache dir path.
+func setupTestdataCache(t *testing.T) (fsext.Fs, string) {
 	t.Helper()
 
-	lines := strings.Split(output, "\n")
-	col := -1
-	for _, line := range lines {
-		var trimmed string
-		switch {
-		case strings.HasPrefix(line, "- "):
-			trimmed = strings.TrimPrefix(line, "- ")
-		case strings.HasPrefix(line, "  "):
-			trimmed = strings.TrimPrefix(line, "  ")
-		default:
-			continue
-		}
-		// Skip lines like "(no subtopics)" or usage hints ("→ ...") that aren't name+description pairs.
-		if strings.HasPrefix(trimmed, "(") || strings.HasPrefix(trimmed, "→") {
-			continue
-		}
-		// Find where the name ends and description begins.
-		// The name is left-padded, so look for the first double-space or the
-		// transition from non-space to space-then-non-space after the name.
-		// With our format "  %-Ns desc", the description starts after the
-		// padded name field. We find the column by looking at each character.
-		descStart := -1
-		inName := true
-		for i, ch := range trimmed {
-			if inName && ch == ' ' {
-				inName = false
-			}
-			if !inName && ch != ' ' {
-				descStart = i
-				break
-			}
-		}
-		if descStart < 0 {
-			continue // blank or name-only line
-		}
-		if col < 0 {
-			col = descStart
-		} else if descStart != col {
-			t.Errorf("%s: misaligned descriptions — expected column %d but got %d in line %q",
-				label, col, descStart, line)
-		}
-	}
-}
-
-func TestChildName(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		childSlug  string
-		parentSlug string
-		want       string
-	}{
-		{"javascript-api/k6-http", "javascript-api", "k6-http"},
-		{"javascript-api/k6-http/get", "javascript-api/k6-http", "get"},
-		{"javascript-api/k6-http/post", "javascript-api/k6-http", "post"},
-		{"using-k6/scenarios", "using-k6", "scenarios"},
-		{"examples/websockets", "examples", "websockets"},
-		// Strip redundant parent-name prefix from child name.
-		{"javascript-api/k6-http/cookiejar/cookiejar-clear", "javascript-api/k6-http/cookiejar", "clear"},
-		{"javascript-api/k6-http/cookiejar/cookiejar-cookiesforurl", "javascript-api/k6-http/cookiejar", "cookiesforurl"},
-		{"javascript-api/k6-http/cookiejar/cookiejar-set", "javascript-api/k6-http/cookiejar", "set"},
-		// When parent doesn't match as prefix, fall back to last segment.
-		{"javascript-api/k6-http/get", "", "get"},
-		{"using-k6/scenarios", "other", "scenarios"},
-		// No slash at all returns the slug itself.
-		{"toplevel", "", "toplevel"},
-		{"toplevel", "other", "toplevel"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.childSlug+"_parent_"+tt.parentSlug, func(t *testing.T) {
-			t.Parallel()
-			got := childName(tt.childSlug, tt.parentSlug)
-			if got != tt.want {
-				t.Errorf("childName(%q, %q) = %q, want %q", tt.childSlug, tt.parentSlug, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestSlugToArgs(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		slug string
-		want string
-	}{
-		{"javascript-api/k6-http/cookiejar", "http cookiejar"},
-		{"javascript-api/k6-http", "http"},
-		{"javascript-api/crypto/subtlecrypto", "crypto subtlecrypto"},
-		{"javascript-api/jslib", "jslib"},
-		{"using-k6/scenarios", "using-k6 scenarios"},
-		{"examples/websockets", "examples websockets"},
-		{"javascript-api", "javascript-api"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.slug, func(t *testing.T) {
-			t.Parallel()
-			got := slugToArgs(tt.slug)
-			if got != tt.want {
-				t.Errorf("slugToArgs(%q) = %q, want %q", tt.slug, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestTruncate(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		input string
-		limit int
-		want  string
-	}{
-		{"short", 80, "short"},
-		{"exactly ten", 11, "exactly ten"},
-		{"this string is longer than ten", 10, "this st..."},
-		{"", 80, ""},
-		{"abc", 3, "abc"},
-		{"abcd", 3, "..."},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			t.Parallel()
-			got := truncate(tt.input, tt.limit)
-			if got != tt.want {
-				t.Errorf("truncate(%q, %d) = %q, want %q", tt.input, tt.limit, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestPrintAlignedList(t *testing.T) {
-	t.Parallel()
-
-	t.Run("basic alignment", func(t *testing.T) {
-		t.Parallel()
-		var buf bytes.Buffer
-		items := []listItem{
-			{Name: "ab", Description: "Short name."},
-			{Name: "a-very-long-name", Description: "Long name."},
-		}
-		printAlignedList(&buf, items, "  ")
-		out := buf.String()
-
-		checkAlignment(t, "printAlignedList basic", out)
-
-		if !strings.Contains(out, "ab") {
-			t.Error("missing 'ab'")
-		}
-		if !strings.Contains(out, "a-very-long-name") {
-			t.Error("missing 'a-very-long-name'")
-		}
-	})
-
-	t.Run("deduplicates by name", func(t *testing.T) {
-		t.Parallel()
-		var buf bytes.Buffer
-		items := []listItem{
-			{Name: "cookiejar", Description: "First description."},
-			{Name: "cookiejar", Description: "Second description."},
-			{Name: "other", Description: "Other item."},
-		}
-		printAlignedList(&buf, items, "  ")
-		out := buf.String()
-
-		// "cookiejar" should appear exactly once.
-		if strings.Count(out, "cookiejar") != 1 {
-			t.Errorf("expected 'cookiejar' once, got %d times\noutput:\n%s",
-				strings.Count(out, "cookiejar"), out)
-		}
-		// First description wins.
-		if !strings.Contains(out, "First description.") {
-			t.Error("missing first description for deduplicated item")
-		}
-		if strings.Contains(out, "Second description.") {
-			t.Error("second duplicate description should not appear")
-		}
-
-		checkAlignment(t, "printAlignedList dedup", out)
-	})
-
-	t.Run("custom indent", func(t *testing.T) {
-		t.Parallel()
-		var buf bytes.Buffer
-		items := []listItem{
-			{Name: "foo", Description: "Foo desc."},
-		}
-		printAlignedList(&buf, items, "    ")
-		out := buf.String()
-
-		if !strings.HasPrefix(out, "    ") {
-			t.Errorf("expected 4-space indent, got: %q", out)
-		}
-	})
-
-	t.Run("empty list", func(t *testing.T) {
-		t.Parallel()
-		var buf bytes.Buffer
-		printAlignedList(&buf, nil, "  ")
-		if buf.Len() != 0 {
-			t.Errorf("expected empty output for nil items, got: %q", buf.String())
-		}
-	})
-}
-
-func TestPrintTOC(t *testing.T) {
-	t.Parallel()
-
-	_, _, idx := setupTestCache(t)
-
-	var buf bytes.Buffer
-	printTOC(&buf, idx, "v0.55.x")
-	out := buf.String()
-
-	// Check header.
-	if !strings.Contains(out, "k6 Documentation (v0.55.x)") {
-		t.Error("printTOC: missing header with version")
-	}
-	if !strings.Contains(out, "Use: k6 x docs <topic>") {
-		t.Error("printTOC: missing usage line")
-	}
-
-	// Check categories appear.
-	if !strings.Contains(out, "## JavaScript API") {
-		t.Error("printTOC: missing JavaScript API category")
-	}
-	if !strings.Contains(out, "## Using k6") {
-		t.Error("printTOC: missing Using k6 category")
-	}
-	if !strings.Contains(out, "## Examples") {
-		t.Error("printTOC: missing Examples category")
-	}
-
-	// Check children listed under JavaScript API use child names (relative to parent).
-	if !strings.Contains(out, "k6-http") {
-		t.Error("printTOC: missing 'k6-http' child name under JavaScript API")
-	}
-
-	// Check usage hint lines after each category's children.
-	if !strings.Contains(out, "→ Usage: k6 x docs javascript-api <topic>") {
-		t.Error("printTOC: missing usage hint for javascript-api")
-	}
-	if !strings.Contains(out, "→ Usage: k6 x docs using-k6 <topic>") {
-		t.Error("printTOC: missing usage hint for using-k6")
-	}
-	if !strings.Contains(out, "→ Usage: k6 x docs examples <topic>") {
-		t.Error("printTOC: missing usage hint for examples")
-	}
-
-	// Check alignment within each category section.
-	// Split by category headers and check each section.
-	catSections := strings.Split(out, "## ")
-	for _, section := range catSections[1:] { // skip the header before first ##
-		checkAlignment(t, "printTOC", "  "+strings.SplitN(section, "\n", 2)[1])
-	}
-}
-
-func TestPrintSection(t *testing.T) {
-	t.Parallel()
-
-	afs, cacheDir, idx := setupTestCache(t)
-
-	t.Run("section with content and children", func(t *testing.T) {
-		t.Parallel()
-
-		sec, ok := idx.Lookup("javascript-api/k6-http")
-		if !ok {
-			t.Fatal("Lookup(javascript-api/k6-http): not found")
-		}
-
-		var buf bytes.Buffer
-		printSection(afs, &buf, idx, sec, cacheDir, "v0.55.x")
-		out := buf.String()
-
-		// Content from markdown file (frontmatter stripped by Transform).
-		if !strings.Contains(out, "The HTTP module.") {
-			t.Error("printSection: missing markdown content")
-		}
-
-		// Subtopics footer.
-		if !strings.Contains(out, "---") {
-			t.Error("printSection: missing separator")
-		}
-		if !strings.Contains(out, "Subtopics:") {
-			t.Error("printSection: missing Subtopics line")
-		}
-		if !strings.Contains(out, "get") {
-			t.Error("printSection: missing 'get' in subtopics")
-		}
-		if !strings.Contains(out, "post") {
-			t.Error("printSection: missing 'post' in subtopics")
-		}
-		if !strings.Contains(out, "Use: k6 x docs http <subtopic>") {
-			t.Error("printSection: missing usage hint")
-		}
-	})
-
-	t.Run("leaf section without children", func(t *testing.T) {
-		t.Parallel()
-
-		sec, ok := idx.Lookup("javascript-api/k6-http/get")
-		if !ok {
-			t.Fatal("Lookup(javascript-api/k6-http/get): not found")
-		}
-
-		var buf bytes.Buffer
-		printSection(afs, &buf, idx, sec, cacheDir, "v0.55.x")
-		out := buf.String()
-
-		if !strings.Contains(out, "http.get(url)") {
-			t.Error("printSection leaf: missing content")
-		}
-		if strings.Contains(out, "Subtopics:") {
-			t.Error("printSection leaf: should not have subtopics footer")
-		}
-	})
-}
-
-func TestPrintList(t *testing.T) {
-	t.Parallel()
-
-	_, _, idx := setupTestCache(t)
-
-	t.Run("section with children", func(t *testing.T) {
-		t.Parallel()
-
-		var buf bytes.Buffer
-		printList(&buf, idx, "javascript-api/k6-http")
-		out := buf.String()
-
-		if !strings.Contains(out, "k6/http") {
-			t.Error("printList: missing section title")
-		}
-		if !strings.Contains(out, "HTTP module for k6.") {
-			t.Error("printList: missing section description")
-		}
-		if !strings.Contains(out, "get") {
-			t.Error("printList: missing child 'get'")
-		}
-		if !strings.Contains(out, "post") {
-			t.Error("printList: missing child 'post'")
-		}
-		checkAlignment(t, "printList", out)
-	})
-
-	t.Run("section without children", func(t *testing.T) {
-		t.Parallel()
-
-		var buf bytes.Buffer
-		printList(&buf, idx, "javascript-api/k6-http/get")
-		out := buf.String()
-
-		if !strings.Contains(out, "get") {
-			t.Error("printList no children: missing title")
-		}
-		if !strings.Contains(out, "(no subtopics)") {
-			t.Error("printList no children: missing 'no subtopics' message")
-		}
-	})
-
-	t.Run("nonexistent slug", func(t *testing.T) {
-		t.Parallel()
-
-		var buf bytes.Buffer
-		printList(&buf, idx, "does-not-exist")
-		out := buf.String()
-
-		if !strings.Contains(out, "Topic not found") {
-			t.Error("printList missing: expected 'Topic not found' message")
-		}
-	})
-}
-
-func TestPrintSearch(t *testing.T) {
-	t.Parallel()
-
-	afs, cacheDir, idx := setupTestCache(t)
-
-	t.Run("match in title groups by parent", func(t *testing.T) {
-		t.Parallel()
-
-		var buf bytes.Buffer
-		printSearch(afs, &buf, idx, "Scenarios", cacheDir, "v0.55.x")
-		out := buf.String()
-
-		if !strings.Contains(out, `Results for "Scenarios"`) {
-			t.Error("printSearch: missing results header")
-		}
-		// Should be grouped under using-k6.
-		if !strings.Contains(out, "using-k6:") {
-			t.Error("printSearch: missing 'using-k6:' group header")
-		}
-		if !strings.Contains(out, "scenarios") {
-			t.Error("printSearch: missing 'scenarios' result")
-		}
-	})
-
-	t.Run("match in description shows group with description", func(t *testing.T) {
-		t.Parallel()
-
-		var buf bytes.Buffer
-		printSearch(afs, &buf, idx, "GET request", cacheDir, "v0.55.x")
-		out := buf.String()
-
-		// Should be grouped under k6-http.
-		if !strings.Contains(out, "k6-http:") {
-			t.Error("printSearch: missing 'k6-http:' group header")
-		}
-		if !strings.Contains(out, "get") {
-			t.Error("printSearch: missing 'get' result")
-		}
-		checkAlignment(t, "printSearch", out)
-	})
-
-	t.Run("match in body content", func(t *testing.T) {
-		t.Parallel()
-
-		var buf bytes.Buffer
-		printSearch(afs, &buf, idx, "WebSocket example content", cacheDir, "v0.55.x")
-		out := buf.String()
-
-		if !strings.Contains(out, "examples:") {
-			t.Error("printSearch: missing 'examples:' group header")
-		}
-		if !strings.Contains(out, "websockets") {
-			t.Error("printSearch: missing 'websockets' result")
-		}
-	})
-
-	t.Run("groups sorted alphabetically", func(t *testing.T) {
-		t.Parallel()
-
-		var buf bytes.Buffer
-		// Search for "k6" which should match multiple groups.
-		printSearch(afs, &buf, idx, "k6", cacheDir, "v0.55.x")
-		checkGroupsSorted(t, buf.String())
-	})
-
-	t.Run("no results", func(t *testing.T) {
-		t.Parallel()
-
-		var buf bytes.Buffer
-		printSearch(afs, &buf, idx, "zzzznotfound", cacheDir, "v0.55.x")
-		out := buf.String()
-
-		if !strings.Contains(out, "(no results)") {
-			t.Error("printSearch no results: missing 'no results' message")
-		}
-	})
-}
-
-func TestPrintTopLevelList(t *testing.T) {
-	t.Parallel()
-
-	_, _, idx := setupTestCache(t)
-
-	var buf bytes.Buffer
-	printTopLevelList(&buf, idx)
-	out := buf.String()
-
-	// Should list all top-level categories.
-	if !strings.Contains(out, "javascript-api") {
-		t.Error("printTopLevelList: missing 'javascript-api'")
-	}
-	if !strings.Contains(out, "using-k6") {
-		t.Error("printTopLevelList: missing 'using-k6'")
-	}
-	if !strings.Contains(out, "examples") {
-		t.Error("printTopLevelList: missing 'examples'")
-	}
-
-	// Should include descriptions.
-	if !strings.Contains(out, "k6 JavaScript API reference.") {
-		t.Error("printTopLevelList: missing javascript-api description")
-	}
-	if !strings.Contains(out, "Learn how to use k6.") {
-		t.Error("printTopLevelList: missing using-k6 description")
-	}
-
-	checkAlignment(t, "printTopLevelList", out)
-}
-
-func TestDynamicAlignment(t *testing.T) {
-	t.Parallel()
-
-	// Build an index with children of varying name lengths under one parent.
-	idx := &Index{
-		Sections: []Section{
-			{
-				Slug: "parent", Title: "Parent", Description: "Parent topic.", Weight: 1, Category: "parent",
-				Children: []string{"parent/ab", "parent/a-very-long-child-name"}, IsIndex: true,
-			},
-			{Slug: "parent/ab", Title: "AB", Description: "Short name child.", Weight: 1, Category: "parent"},
-			{Slug: "parent/a-very-long-child-name", Title: "Long", Description: "Long name child.", Weight: 2, Category: "parent"},
-		},
-	}
-	idx.bySlug = make(map[string]*Section, len(idx.Sections))
-	for i := range idx.Sections {
-		idx.bySlug[idx.Sections[i].Slug] = &idx.Sections[i]
-	}
-
-	var buf bytes.Buffer
-	printList(&buf, idx, "parent")
-	out := buf.String()
-
-	// Both description columns must start at the same position.
-	lines := strings.Split(out, "\n")
-	var descStarts []int
-	for _, line := range lines {
-		var trimmed string
-		switch {
-		case strings.HasPrefix(line, "- "):
-			trimmed = strings.TrimPrefix(line, "- ")
-		case strings.HasPrefix(line, "  "):
-			trimmed = strings.TrimPrefix(line, "  ")
-		default:
-			continue
-		}
-		if strings.HasPrefix(trimmed, "(") {
-			continue
-		}
-		inName := true
-		for i, ch := range trimmed {
-			if inName && ch == ' ' {
-				inName = false
-			}
-			if !inName && ch != ' ' {
-				descStarts = append(descStarts, i)
-				break
-			}
-		}
-	}
-	if len(descStarts) < 2 {
-		t.Fatalf("expected at least 2 listing lines, got %d", len(descStarts))
-	}
-	for i := 1; i < len(descStarts); i++ {
-		if descStarts[i] != descStarts[0] {
-			t.Errorf("descriptions not aligned: line 0 starts at %d, line %d starts at %d\noutput:\n%s",
-				descStarts[0], i, descStarts[i], out)
-		}
-	}
-}
-
-func TestPrintBestPractices(t *testing.T) {
-	t.Parallel()
-
-	afs, cacheDir, _ := setupTestCache(t)
-
-	var buf bytes.Buffer
-	err := printBestPractices(afs, &buf, cacheDir, "v0.55.x")
-	if err != nil {
-		t.Fatalf("printBestPractices: %v", err)
-	}
-
-	out := buf.String()
-	if !strings.Contains(out, "Follow these best practices for k6.") {
-		t.Error("printBestPractices: missing content")
-	}
-	// Frontmatter should be stripped.
-	if strings.Contains(out, "---") {
-		t.Error("printBestPractices: frontmatter not stripped")
-	}
-}
-
-func TestPrintBestPracticesMissing(t *testing.T) {
-	t.Parallel()
-
 	afs := fsext.NewMemMapFs()
-	dir := "/tmp/missing-bp"
-	if err := afs.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
+	cacheDir := "/tmp/testcache"
+
+	srcDir := filepath.Join("testdata", "cache")
+	err := filepath.WalkDir(srcDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(srcDir, path)
+		target := filepath.Join(cacheDir, rel)
+		if d.IsDir() {
+			return afs.MkdirAll(target, 0o755)
+		}
+		content, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		return fsext.WriteFile(afs, target, content, 0o644)
+	})
+	if err != nil {
+		t.Fatalf("copy testdata: %v", err)
 	}
-	// No best_practices.md — should return error.
-	var buf bytes.Buffer
-	err := printBestPractices(afs, &buf, dir, "v0.55.x")
-	if err == nil {
-		t.Fatal("printBestPractices: expected error for missing file, got nil")
-	}
+
+	return afs, cacheDir
 }
 
-func TestPrintAll(t *testing.T) {
-	t.Parallel()
+// setupCommand creates a test command environment and returns run/runErr helpers
+// that execute the docs command with --cache-dir and --version pre-configured.
+func setupCommand(t *testing.T) (func(*testing.T, ...string) string, func(*testing.T, ...string) error) {
+	t.Helper()
 
-	afs, cacheDir, idx := setupTestCache(t)
-
-	var buf bytes.Buffer
-	printAll(afs, &buf, idx, cacheDir, "v0.55.x")
-	out := buf.String()
-
-	if !strings.Contains(out, "k6 Documentation (v0.55.x)") {
-		t.Error("printAll: missing header")
-	}
-
-	// Check that sections are included.
-	if !strings.Contains(out, "# JavaScript API") {
-		t.Error("printAll: missing JavaScript API section heading")
-	}
-	if !strings.Contains(out, "# Scenarios") {
-		t.Error("printAll: missing Scenarios section heading")
-	}
-	if !strings.Contains(out, "The HTTP module.") {
-		t.Error("printAll: missing HTTP module content")
-	}
-
-	// Verify no duplicate headings: each H1 should appear exactly once.
-	if strings.Count(out, "# JavaScript API") != 1 {
-		t.Errorf("printAll: duplicate '# JavaScript API' heading (count=%d)", strings.Count(out, "# JavaScript API"))
-	}
-	if strings.Count(out, "# Scenarios") != 1 {
-		t.Errorf("printAll: duplicate '# Scenarios' heading (count=%d)", strings.Count(out, "# Scenarios"))
-	}
-}
-
-func TestCommandIntegration(t *testing.T) {
-	t.Parallel()
-
-	afs, cacheDir, _ := setupTestCache(t)
+	afs, cacheDir := setupTestdataCache(t)
 	gs := newTestGlobalState(t, afs)
 
 	run := func(t *testing.T, args ...string) string {
@@ -804,116 +263,352 @@ func TestCommandIntegration(t *testing.T) {
 		cmd.SetErr(&buf)
 		cmd.SetArgs(append([]string{"--cache-dir", cacheDir, "--version", "v0.55.x"}, args...))
 		if err := cmd.Execute(); err != nil {
-			t.Fatalf("cmd.Execute: %v", err)
+			t.Fatalf("cmd.Execute(%v): %v", args, err)
 		}
 		return buf.String()
 	}
 
-	t.Run("no args shows TOC", func(t *testing.T) {
-		t.Parallel()
+	runErr := func(t *testing.T, args ...string) error {
+		t.Helper()
+		cmd := newCmd(gs)
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+		cmd.SetErr(&buf)
+		cmd.SetArgs(append([]string{"--cache-dir", cacheDir, "--version", "v0.55.x"}, args...))
+		return cmd.Execute()
+	}
 
-		out := run(t)
-		if !strings.Contains(out, "k6 Documentation (v0.55.x)") {
-			t.Error("integration TOC: missing header")
+	return run, runErr
+}
+
+var updateGolden = os.Getenv("UPDATE_GOLDEN") != "" //nolint:gochecknoglobals // test-only flag for golden file generation
+
+func assertGolden(t *testing.T, name, actual string) {
+	t.Helper()
+
+	path := filepath.Join("testdata", "golden", name)
+	if updateGolden {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(actual), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+
+	expected, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("golden file %s: %v\nRun with UPDATE_GOLDEN=1 to create", path, err)
+	}
+	if actual != string(expected) {
+		t.Errorf("output mismatch for %s:\n\nwant:\n%s\n\ngot:\n%s", name, string(expected), actual)
+	}
+}
+
+func TestTOC(t *testing.T) {
+	t.Parallel()
+
+	run, _ := setupCommand(t)
+	assertGolden(t, "toc.txt", run(t))
+}
+
+func TestViewTopic(t *testing.T) {
+	t.Parallel()
+
+	run, _ := setupCommand(t)
+
+	t.Run("section_with_children", func(t *testing.T) {
+		t.Parallel()
+		assertGolden(t, "view/http.txt", run(t, "http"))
+	})
+	t.Run("leaf_section", func(t *testing.T) {
+		t.Parallel()
+		assertGolden(t, "view/http-get.txt", run(t, "http", "get"))
+	})
+	t.Run("parent_prefix_stripped", func(t *testing.T) {
+		t.Parallel()
+		assertGolden(t, "view/http-cookiejar.txt", run(t, "http", "cookiejar"))
+	})
+	t.Run("deep_leaf", func(t *testing.T) {
+		t.Parallel()
+		assertGolden(t, "view/http-cookiejar-clear.txt", run(t, "http", "cookiejar", "clear"))
+	})
+	t.Run("non_js_api_with_children", func(t *testing.T) {
+		t.Parallel()
+		assertGolden(t, "view/using-k6.txt", run(t, "using-k6"))
+	})
+}
+
+func TestListTopics(t *testing.T) {
+	t.Parallel()
+
+	run, _ := setupCommand(t)
+
+	t.Run("no_args", func(t *testing.T) {
+		t.Parallel()
+		assertGolden(t, "list/no-args.txt", run(t, "--list"))
+	})
+	t.Run("topic_with_children", func(t *testing.T) {
+		t.Parallel()
+		assertGolden(t, "list/http.txt", run(t, "--list", "http"))
+	})
+	t.Run("leaf", func(t *testing.T) {
+		t.Parallel()
+		assertGolden(t, "list/http-get.txt", run(t, "--list", "http", "get"))
+	})
+}
+
+func TestAllDocs(t *testing.T) {
+	t.Parallel()
+
+	run, _ := setupCommand(t)
+	assertGolden(t, "all.txt", run(t, "--all"))
+}
+
+func TestSearchCommand(t *testing.T) {
+	t.Parallel()
+
+	run, runErr := setupCommand(t)
+
+	t.Run("by_title", func(t *testing.T) {
+		t.Parallel()
+		assertGolden(t, "search/scenarios.txt", run(t, "search", "Scenarios"))
+	})
+	t.Run("by_description", func(t *testing.T) {
+		t.Parallel()
+		assertGolden(t, "search/get-request.txt", run(t, "search", "GET request"))
+	})
+	t.Run("multi_group", func(t *testing.T) {
+		t.Parallel()
+		assertGolden(t, "search/k6.txt", run(t, "search", "k6"))
+	})
+	t.Run("body_content", func(t *testing.T) {
+		t.Parallel()
+		assertGolden(t, "search/websocket.txt", run(t, "search", "WebSocket example content"))
+	})
+	t.Run("no_results", func(t *testing.T) {
+		t.Parallel()
+		assertGolden(t, "search/no-results.txt", run(t, "search", "zzzznotfound"))
+	})
+	t.Run("title_match_before_body_match", func(t *testing.T) {
+		t.Parallel()
+		assertGolden(t, "search/http-module.txt", run(t, "search", "HTTP module"))
+	})
+	t.Run("missing_arg", func(t *testing.T) {
+		t.Parallel()
+		err := runErr(t, "search")
+		if err == nil {
+			t.Fatal("search with no args should error")
 		}
 	})
+}
 
-	t.Run("topic arg shows section", func(t *testing.T) {
+func TestBestPractices(t *testing.T) {
+	t.Parallel()
+
+	run, _ := setupCommand(t)
+
+	t.Run("content", func(t *testing.T) {
 		t.Parallel()
-
-		out := run(t, "using-k6", "scenarios")
-		if !strings.Contains(out, "Scenarios let you configure execution.") {
-			t.Error("integration section: missing content")
-		}
+		assertGolden(t, "best-practices.txt", run(t, "best-practices"))
 	})
 
-	t.Run("--list flag without args shows top-level list", func(t *testing.T) {
+	t.Run("missing_file", func(t *testing.T) {
 		t.Parallel()
 
-		out := run(t, "--list")
-		if !strings.Contains(out, "javascript-api") {
-			t.Error("integration --list no args: missing 'javascript-api'")
+		noBPFs := fsext.NewMemMapFs()
+		noBPDir := "/tmp/nobpcache"
+		if err := noBPFs.MkdirAll(noBPDir, 0o755); err != nil {
+			t.Fatal(err)
 		}
-		if !strings.Contains(out, "using-k6") {
-			t.Error("integration --list no args: missing 'using-k6'")
+		noBPIdx := &Index{Version: "v0.55.x", Sections: []Section{}}
+		data, err := json.Marshal(noBPIdx)
+		if err != nil {
+			t.Fatal(err)
 		}
-		// Should NOT show the full TOC header.
-		if strings.Contains(out, "k6 Documentation") {
-			t.Error("integration --list no args: should not show TOC header")
+		if err := fsext.WriteFile(noBPFs, filepath.Join(noBPDir, "sections.json"), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		gs := newTestGlobalState(t, noBPFs)
+		cmd := newCmd(gs)
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+		cmd.SetErr(&buf)
+		cmd.SetArgs([]string{"--cache-dir", noBPDir, "--version", "v0.55.x", "best-practices"})
+		if err := cmd.Execute(); err == nil {
+			t.Fatal("expected error for missing best_practices.md")
 		}
 	})
+}
 
-	t.Run("--list flag with topic shows compact listing", func(t *testing.T) {
-		t.Parallel()
+func TestUnknownTopic(t *testing.T) {
+	t.Parallel()
 
-		out := run(t, "--list", "javascript-api/k6-http")
-		if !strings.Contains(out, "get") {
-			t.Error("integration --list: missing 'get'")
+	_, runErr := setupCommand(t)
+	err := runErr(t, "nonexistent-topic-xyz")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	assertGolden(t, "errors/unknown-topic.txt", err.Error())
+}
+
+func TestAutoDetectVersion(t *testing.T) {
+	t.Parallel()
+
+	// No --version flag, no K6_DOCS_VERSION env.
+	// The command auto-detects k6 version from Go build info.
+	// Since we import k6, DetectK6Version returns a real version.
+	// We can't use testdata/cache (wrong version), so we just verify
+	// the setup function returns a version and doesn't error.
+	//
+	// This tests the FULL precedence chain: flag -> env -> auto-detect.
+	// With no flag and no env, auto-detect must succeed.
+
+	afs, _ := setupTestdataCache(t)
+	gs := newTestGlobalState(t, afs)
+	// Don't set K6_DOCS_VERSION -- force auto-detect
+
+	// We need a cache at the auto-detected version path.
+	// DetectK6Version returns something like "v1.5.x".
+	// Create a minimal cache at that path.
+	version, err := DetectK6Version()
+	if err != nil {
+		// debug.ReadBuildInfo may not list go.k6.io/k6 as a dep in
+		// test binaries depending on the Go version and build mode.
+		t.Skipf("DetectK6Version unavailable in this build: %v", err)
+	}
+
+	// Copy testdata cache to the auto-detected version dir too.
+	// (The actual version in sections.json won't match but LoadIndex doesn't check.)
+	autoDir, err := CacheDir(gs.Env, version)
+	if err != nil {
+		// CacheDir needs HOME. Set it.
+		gs.Env["HOME"] = "/fakehome"
+		autoDir, err = CacheDir(gs.Env, version)
+		if err != nil {
+			t.Fatalf("CacheDir: %v", err)
 		}
-	})
+	}
 
-	t.Run("--all flag prints everything", func(t *testing.T) {
-		t.Parallel()
-
-		out := run(t, "--all")
-		if !strings.Contains(out, "k6 Documentation (v0.55.x)") {
-			t.Error("integration --all: missing header")
+	// Copy the testdata cache to the auto-detected version cache dir.
+	srcDir := filepath.Join("testdata", "cache")
+	if walkErr := filepath.WalkDir(srcDir, func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
 		}
-		if !strings.Contains(out, "# JavaScript API") {
-			t.Error("integration --all: missing section")
+		rel, _ := filepath.Rel(srcDir, path)
+		target := filepath.Join(autoDir, rel)
+		if d.IsDir() {
+			return afs.MkdirAll(target, 0o755)
 		}
-	})
+		content, _ := os.ReadFile(path)
+		return fsext.WriteFile(afs, target, content, 0o644)
+	}); walkErr != nil {
+		t.Fatalf("copy testdata to auto-detect dir: %v", walkErr)
+	}
 
-	t.Run("search subcommand", func(t *testing.T) {
+	// Also need to set HOME so CacheDir works inside setup().
+	if gs.Env["HOME"] == "" {
+		gs.Env["HOME"] = "/fakehome"
+	}
+
+	// Run without --version and without --cache-dir flags
+	cmd := newCmd(gs)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+	// No --version, no --cache-dir
+	cmd.SetArgs([]string{})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("auto-detect path failed: %v\nversion: %s", err, version)
+	}
+
+	// Should show the auto-detected version in the header
+	out := buf.String()
+	if !strings.Contains(out, "k6 Documentation ("+version+")") {
+		t.Errorf("expected auto-detected version %s in output, got:\n%s", version, out)
+	}
+}
+
+func TestVersionPrecedence(t *testing.T) {
+	t.Parallel()
+
+	t.Run("flag_overrides_env", func(t *testing.T) {
 		t.Parallel()
-
-		out := run(t, "search", "HTTP")
-		if !strings.Contains(out, `Results for "HTTP"`) {
-			t.Error("integration search: missing results header")
-		}
-	})
-
-	t.Run("best-practices arg", func(t *testing.T) {
-		t.Parallel()
-
-		out := run(t, "best-practices")
-		if !strings.Contains(out, "Follow these best practices for k6.") {
-			t.Error("integration best-practices: missing content")
-		}
-	})
-
-	t.Run("unknown topic returns error", func(t *testing.T) {
-		t.Parallel()
+		afs, cacheDir := setupTestdataCache(t)
+		gs := newTestGlobalState(t, afs)
+		gs.Env["K6_DOCS_VERSION"] = "v9.9.x"
 
 		cmd := newCmd(gs)
 		var buf bytes.Buffer
 		cmd.SetOut(&buf)
 		cmd.SetErr(&buf)
-		cmd.SetArgs([]string{"--cache-dir", cacheDir, "--version", "v0.55.x", "nonexistent-topic-xyz"})
-
-		err := cmd.Execute()
-		if err == nil {
-			t.Fatal("integration unknown topic: expected error, got nil")
+		cmd.SetArgs([]string{"--cache-dir", cacheDir, "--version", "v0.55.x"})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("cmd.Execute: %v", err)
 		}
-		if !strings.Contains(err.Error(), "topic not found") {
-			t.Errorf("integration unknown topic: error = %q, want to contain 'topic not found'", err.Error())
+		if !strings.Contains(buf.String(), "k6 Documentation (v0.55.x)") {
+			t.Error("--version flag should override K6_DOCS_VERSION env")
 		}
 	})
-}
 
-func checkGroupsSorted(t *testing.T, out string) {
-	t.Helper()
+	t.Run("env_used_when_no_flag", func(t *testing.T) {
+		t.Parallel()
+		afs, cacheDir := setupTestdataCache(t)
+		gs := newTestGlobalState(t, afs)
+		gs.Env["K6_DOCS_VERSION"] = "v0.55.x"
 
-	lines := strings.Split(out, "\n")
-	var groupHeaders []string
-	for _, line := range lines {
-		if strings.HasSuffix(line, ":") || (strings.Contains(line, ":") && !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "Results")) {
-			groupHeaders = append(groupHeaders, line)
+		cmd := newCmd(gs)
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+		cmd.SetErr(&buf)
+		cmd.SetArgs([]string{"--cache-dir", cacheDir})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("cmd.Execute: %v", err)
 		}
-	}
-	for i := 1; i < len(groupHeaders); i++ {
-		if groupHeaders[i] < groupHeaders[i-1] {
-			t.Errorf("printSearch: groups not sorted: %q before %q", groupHeaders[i-1], groupHeaders[i])
+		if !strings.Contains(buf.String(), "k6 Documentation (v0.55.x)") {
+			t.Error("K6_DOCS_VERSION env should be used when no --version flag")
 		}
-	}
+	})
+
+	t.Run("cache_dir_env_used_when_no_flag", func(t *testing.T) {
+		t.Parallel()
+		afs, cacheDir := setupTestdataCache(t)
+		gs := newTestGlobalState(t, afs)
+		gs.Env["K6_DOCS_CACHE_DIR"] = cacheDir
+
+		cmd := newCmd(gs)
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+		cmd.SetErr(&buf)
+		cmd.SetArgs([]string{"--version", "v0.55.x"})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("cmd.Execute: %v", err)
+		}
+		if !strings.Contains(buf.String(), "k6 Documentation (v0.55.x)") {
+			t.Error("K6_DOCS_CACHE_DIR env should be used when no --cache-dir flag")
+		}
+	})
+
+	t.Run("cache_dir_flag_overrides_env", func(t *testing.T) {
+		t.Parallel()
+		afs, cacheDir := setupTestdataCache(t)
+		gs := newTestGlobalState(t, afs)
+		gs.Env["K6_DOCS_CACHE_DIR"] = "/nonexistent/path"
+
+		cmd := newCmd(gs)
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+		cmd.SetErr(&buf)
+		cmd.SetArgs([]string{"--cache-dir", cacheDir, "--version", "v0.55.x"})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("cmd.Execute: %v", err)
+		}
+		if !strings.Contains(buf.String(), "k6 Documentation (v0.55.x)") {
+			t.Error("--cache-dir flag should override K6_DOCS_CACHE_DIR env")
+		}
+	})
 }

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -171,17 +172,30 @@ func pipeRenderer(
 		return err
 	}
 
-	rc := exec.CommandContext(ctx, parts[0], parts[1:]...) //nolint:gosec // user-configured renderer
-	rc.Stdin = bytes.NewReader(raw)
-	rc.Stdout = stdout
-	rc.Stderr = stderr
+	bin, err := exec.LookPath(parts[0])
+	if err != nil {
+		_, writeErr := fallback.Write(raw)
+		return writeErr
+	}
 
-	if err := rc.Run(); err != nil {
+	if err := runRenderer(ctx, bin, parts[1:], bytes.NewReader(raw), stdout, stderr); err != nil {
 		_, writeErr := fallback.Write(raw)
 		return writeErr
 	}
 
 	return nil
+}
+
+func runRenderer(
+	ctx context.Context, bin string, args []string, stdin io.Reader, stdout, stderr io.Writer,
+) error {
+	//nolint:gosec // G204 has no sanitizer support (unlike G304). bin is validated via exec.LookPath.
+	rc := exec.CommandContext(ctx, filepath.Clean(bin), args...)
+	rc.Stdin = stdin
+	rc.Stdout = stdout
+	rc.Stderr = stderr
+
+	return rc.Run()
 }
 
 // setup resolves the version, ensures docs are cached, and loads the index.
