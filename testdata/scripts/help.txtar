@@ -1,0 +1,11 @@
+# Main command help text
+exec k6-docs --help
+stdout 'Access k6 documentation from the command line'
+stdout 'docs \[topic\] \[subtopic\.\.\.\]'
+stdout 'search'
+stdout '--list'
+stdout '--all'
+
+# Search subcommand help text
+exec k6-docs search --help
+stdout 'Search documentation'

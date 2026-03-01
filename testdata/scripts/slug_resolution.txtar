@@ -1,0 +1,53 @@
+# Full slug with /
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x javascript-api/k6-http/get
+cmp stdout golden-get.txt
+
+# JS API shortcut (same output proves correct resolution)
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x http get
+cmp stdout golden-get.txt
+
+# Case insensitive
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x HTTP GET
+cmp stdout golden-get.txt
+
+# k6- prefix dedup
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x k6-http get
+cmp stdout golden-get.txt
+
+# Category prefix
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x using-k6 scenarios
+cmp stdout golden-scenarios.txt
+
+# Parent prefix fallback (cookiejar/clear → cookiejar/cookiejar-clear)
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x http cookiejar clear
+cmp stdout golden-clear.txt
+
+# Bare name prefers unprefixed (both jslib and k6-jslib exist)
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x jslib
+cmp stdout golden-jslib.txt
+
+-- golden-get.txt --
+## http.get(url, [params])
+
+Make an HTTP GET request.
+
+import http from 'k6/http';
+
+export default function () {
+  const res = http.get('https://test-api.k6.io/');
+}
+
+-- golden-scenarios.txt --
+# Scenarios
+
+Scenarios let you configure how your test executes.
+
+See the Scenarios documentation for details.
+-- golden-clear.txt --
+## CookieJar.clear()
+
+Clears all cookies from the cookie jar.
+-- golden-jslib.txt --
+# jslib
+
+JavaScript utility library reference.

@@ -1,6 +1,0 @@
-Results for "Scenarios":
-testing-guides: Guides for various testing scenarios.
-
-using-k6:
-- scenarios  Configure test scenarios.
-

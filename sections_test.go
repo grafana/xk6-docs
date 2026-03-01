@@ -305,6 +305,32 @@ func TestChildrenWithMissingChildSlug(t *testing.T) {
 	}
 }
 
+func TestSearchGroupKey(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		slug string
+		want string
+	}{
+		{slug: "javascript-api/k6-http/get", want: "k6-http"},
+		{slug: "javascript-api/k6-http", want: "k6-http"},
+		{slug: "using-k6/scenarios", want: "using-k6"},
+		{slug: "javascript-api", want: "javascript-api"},
+		{slug: "results", want: "results"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.slug, func(t *testing.T) {
+			t.Parallel()
+
+			got := searchGroupKey(tt.slug)
+			if got != tt.want {
+				t.Errorf("searchGroupKey(%q) = %q, want %q", tt.slug, got, tt.want)
+			}
+		})
+	}
+}
+
 // mustLoadIndex is a test helper that loads the fixture or fails the test.
 func mustLoadIndex(t *testing.T) *Index {
 	t.Helper()

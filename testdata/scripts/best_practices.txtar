@@ -1,3 +1,8 @@
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x best-practices
+cmp stdout golden.txt
+! stdout '---'
+
+-- golden.txt --
 # Best Practices
 
 Follow these best practices for k6 load testing.

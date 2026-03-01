@@ -1,0 +1,43 @@
+# Invalid config warns but continues
+env XDG_CONFIG_HOME=$WORK/invalid-cfg
+mkdir $WORK/invalid-cfg/k6
+cp invalid.yaml $WORK/invalid-cfg/k6/docs.yaml
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x
+stdout 'k6 Documentation'
+stderr 'ignoring invalid config'
+
+# Config loaded via HOME fallback (no XDG_CONFIG_HOME).
+# In non-TTY mode, renderer is skipped, so we verify config doesn't break anything.
+env XDG_CONFIG_HOME=
+env HOME=$WORK/home
+mkdir $WORK/home/.config/k6
+cp cat-n.yaml $WORK/home/.config/k6/docs.yaml
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x http get
+stdout 'http\.get'
+! stderr 'ignoring invalid config'
+
+# HOME and USERPROFILE both unset — config fails gracefully with warning
+env HOME=
+env USERPROFILE=
+env XDG_CONFIG_HOME=
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x
+stdout 'k6 Documentation'
+stderr 'neither HOME nor USERPROFILE'
+
+# File-unreadable config (permission denied) — warning logged, continues
+env XDG_CONFIG_HOME=$WORK/unreadable-cfg
+mkdir $WORK/unreadable-cfg/k6
+cp valid.yaml $WORK/unreadable-cfg/k6/docs.yaml
+chmod 000 $WORK/unreadable-cfg/k6/docs.yaml
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x
+stdout 'k6 Documentation'
+stderr 'ignoring invalid config'
+
+-- invalid.yaml --
+:
+  :
+    : [invalid
+-- cat-n.yaml --
+renderer: cat -n
+-- valid.yaml --
+renderer: cat

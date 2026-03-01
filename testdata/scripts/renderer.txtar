@@ -1,0 +1,21 @@
+# Non-TTY: renderer configured but SKIPPED (cat -n adds tabs if invoked)
+env XDG_CONFIG_HOME=$WORK/cat-cfg
+mkdir $WORK/cat-cfg/k6
+cp cat-n.yaml $WORK/cat-cfg/k6/docs.yaml
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x
+stdout 'k6 Documentation'
+! stdout '\t'
+
+# Non-TTY: no renderer configured — raw output
+env XDG_CONFIG_HOME=
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x http get
+stdout 'http\.get'
+
+# Non-TTY: renderer configured for search — still SKIPPED
+env XDG_CONFIG_HOME=$WORK/cat-cfg
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x search k6
+stdout 'Results for'
+! stdout '\t'
+
+-- cat-n.yaml --
+renderer: cat -n

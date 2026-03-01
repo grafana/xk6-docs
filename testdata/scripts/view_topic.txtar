@@ -1,0 +1,46 @@
+# Section with children shows subtopics footer
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x http
+cmp stdout golden-http.txt
+
+# Leaf section: no subtopics footer, frontmatter stripped
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x http get
+cmp stdout golden-http-get.txt
+! stdout '---'
+! stdout 'title:'
+
+# Child names strip parent prefix (cookiejar-clear -> clear)
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x http cookiejar
+stdout 'Subtopics: clear'
+
+# Non-JS-API usage hint
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x using-k6
+stdout 'Use: k6 x docs using-k6 <subtopic>'
+
+# Missing markdown file: section appears blank (no error shown to user).
+rm $WORK/cache/markdown/testing-guides/_index.md
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x testing-guides
+! stderr 'error'
+! stderr 'not found'
+
+-- golden-http.txt --
+# k6/http
+
+The HTTP module provides functionality for making HTTP requests.
+
+> **Note:** HTTP/2 is supported by default since k6 v0.55.x.
+
+
+---
+Subtopics: get, post, cookiejar, get
+Use: k6 x docs http <subtopic>
+-- golden-http-get.txt --
+## http.get(url, [params])
+
+Make an HTTP GET request.
+
+import http from 'k6/http';
+
+export default function () {
+  const res = http.get('https://test-api.k6.io/');
+}
+

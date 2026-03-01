@@ -1,0 +1,25 @@
+# --all ignores --list (--all wins, checked first in code)
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x --all --list
+stdout 'k6 Documentation'
+! stdout 'Subtopics:'
+
+# --all ignores args
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x --all http get
+stdout 'k6 Documentation'
+
+# best-practices ignores extra args
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x best-practices extra-arg
+! stdout 'extra-arg'
+stdout 'best practices'
+
+# best-practices is case-sensitive
+! exec k6-docs --cache-dir $WORK/cache --version v0.55.x Best-Practices
+stderr 'topic not found'
+
+# --list has no effect on best-practices
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x --list best-practices
+stdout 'best practices'
+
+# --version and --cache-dir inherited by search subcommand
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x search k6
+stdout 'Results for'

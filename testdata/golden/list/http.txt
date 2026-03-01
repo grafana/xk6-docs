@@ -1,4 +1,0 @@
-k6/http — HTTP module for k6.
-- get        Make an HTTP GET request.
-- post       Make an HTTP POST request.
-- cookiejar  HTTP cookie jar.

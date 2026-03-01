@@ -1,4 +1,0 @@
-Results for "WebSocket example content":
-examples:
-- websockets  WebSocket load testing examples including real-time bidirectional communicati...
-

@@ -135,7 +135,7 @@
       "slug": "testing-guides",
       "rel_path": "testing-guides/_index.md",
       "title": "Testing Guides",
-      "description": "Guides for various testing scenarios.",
+      "description": "テスト実行のガイドとベストプラクティスについての詳細なドキュメンテーション情報を提供します",
       "weight": 4,
       "category": "testing-guides",
       "children": null,

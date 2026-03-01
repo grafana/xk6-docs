@@ -1,3 +1,7 @@
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x
+cmp stdout golden.txt
+
+-- golden.txt --
 k6 Documentation (v0.55.x)
 Use: k6 x docs <topic>
 
@@ -19,4 +23,4 @@ Use: k6 x docs <topic>
   → Usage: k6 x docs examples <topic>
 
 ## Testing Guides
-- testing-guides Guides for various testing scenarios.
+- testing-guides テスト実行のガイドとベストプラクティスについての詳�...

@@ -156,6 +156,47 @@ func TestExtractRejectsAbsolutePath(t *testing.T) {
 	}
 }
 
+func TestIsCachedReturnsFalseOnCacheDirFailure(t *testing.T) {
+	t.Parallel()
+
+	afs := fsext.NewMemMapFs()
+	// Empty env: neither HOME nor USERPROFILE set, so CacheDir will fail.
+	env := map[string]string{}
+
+	if IsCached(afs, env, "v1.0.0") {
+		t.Error("IsCached should return false when CacheDir fails, got true")
+	}
+}
+
+func TestExtractSkipsNonRegularEntries(t *testing.T) {
+	t.Parallel()
+
+	afs := fsext.NewMemMapFs()
+
+	archive := buildTarZstRaw(t, []tarEntry{
+		{name: "regular.txt", content: "hello"},
+		{name: "link.txt", typeflag: tar.TypeSymlink, content: ""},
+	})
+
+	dest := "/tmp/skip-nonreg-test"
+	if err := afs.MkdirAll(dest, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	if err := extract(afs, archive, dest); err != nil {
+		t.Fatalf("extract: unexpected error: %v", err)
+	}
+
+	// The regular file should be extracted.
+	assertFileContent(t, afs, filepath.Join(dest, "regular.txt"), "hello")
+
+	// The symlink entry should have been silently skipped.
+	_, err := afs.Stat(filepath.Join(dest, "link.txt"))
+	if err == nil {
+		t.Error("symlink entry should have been skipped, but file exists")
+	}
+}
+
 func TestEnsureDocs(t *testing.T) {
 	t.Parallel()
 
@@ -387,8 +428,9 @@ func (m *mockHTTPClient) Get(_ string) (*http.Response, error) {
 }
 
 type tarEntry struct {
-	name    string
-	content string
+	name     string
+	content  string
+	typeflag byte
 }
 
 func buildTarZst(t *testing.T, files map[string]string) *bytes.Buffer {
@@ -414,9 +456,10 @@ func buildTarZstRaw(t *testing.T, entries []tarEntry) *bytes.Buffer {
 	tw := tar.NewWriter(zw)
 	for _, e := range entries {
 		hdr := &tar.Header{
-			Name: e.name,
-			Mode: 0o644,
-			Size: int64(len(e.content)),
+			Typeflag: e.typeflag,
+			Name:     e.name,
+			Mode:     0o644,
+			Size:     int64(len(e.content)),
 		}
 		if err := tw.WriteHeader(hdr); err != nil {
 			t.Fatalf("WriteHeader(%s): %v", e.name, err)

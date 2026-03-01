@@ -2,40 +2,17 @@ package docs
 
 import "testing"
 
-func TestSlugResolution(t *testing.T) {
+func TestResolveSlashInLaterArg(t *testing.T) {
 	t.Parallel()
 
-	run, _ := setupCommand(t)
-
-	t.Run("full_slug", func(t *testing.T) {
-		t.Parallel()
-		assertGolden(t, "view/http-get.txt", run(t, "javascript-api/k6-http/get"))
-	})
-	t.Run("category_prefix", func(t *testing.T) {
-		t.Parallel()
-		assertGolden(t, "view/using-k6-scenarios.txt", run(t, "using-k6", "scenarios"))
-	})
-	t.Run("js_api_shortcut", func(t *testing.T) {
-		t.Parallel()
-		assertGolden(t, "view/http-get.txt", run(t, "http", "get"))
-	})
-	t.Run("case_insensitive", func(t *testing.T) {
-		t.Parallel()
-		assertGolden(t, "view/http-get.txt", run(t, "HTTP", "GET"))
-	})
-	t.Run("k6_prefix_dedup", func(t *testing.T) {
-		t.Parallel()
-		assertGolden(t, "view/http-get.txt", run(t, "k6-http", "get"))
-	})
-	t.Run("parent_prefix_fallback", func(t *testing.T) {
-		t.Parallel()
-		assertGolden(t, "view/http-cookiejar-clear.txt", run(t, "http", "cookiejar", "clear"))
-	})
-	t.Run("bare_name_prefers_unprefixed", func(t *testing.T) {
-		t.Parallel()
-		// Both javascript-api/jslib and javascript-api/k6-jslib exist.
-		// ResolveWithLookup tries unprefixed first, so "jslib" resolves to
-		// javascript-api/jslib (not javascript-api/k6-jslib).
-		assertGolden(t, "view/jslib.txt", run(t, "jslib"))
-	})
+	// Rule 1: when any arg contains "/", all args are joined with "/".
+	// If the slash is in a later arg (not args[0]), the joined result
+	// is unlikely to match any real slug. This can't be proven through
+	// command output because the error message uses the original args
+	// joined by space, making it indistinguishable from a Rule 3 failure.
+	got := Resolve([]string{"http", "k6-http/get"})
+	want := "http/k6-http/get"
+	if got != want {
+		t.Errorf("Resolve([http, k6-http/get]) = %q, want %q", got, want)
+	}
 }

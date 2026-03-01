@@ -1,3 +1,8 @@
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x --all
+cmp stdout golden.txt
+! stdout 'Subtopics:'
+
+-- golden.txt --
 k6 Documentation (v0.55.x)
 # JavaScript API
 
