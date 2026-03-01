@@ -142,51 +142,6 @@ func printSection(afs fsext.Fs, w io.Writer, idx *Index, section *Section, cache
 	}
 }
 
-// printList prints children of a section in compact format.
-func printList(w io.Writer, idx *Index, slug string) {
-	sec, ok := idx.Lookup(slug)
-	if !ok {
-		_, _ = fmt.Fprintf(w, "Topic not found: %s\n", slug)
-		return
-	}
-
-	children := idx.Children(slug)
-
-	_, _ = fmt.Fprintf(w, "%s", sec.Title)
-	if sec.Description != "" {
-		_, _ = fmt.Fprintf(w, " — %s", sec.Description)
-	}
-	_, _ = fmt.Fprintln(w)
-
-	if len(children) == 0 {
-		_, _ = fmt.Fprintln(w, "\n  (no subtopics)")
-		return
-	}
-
-	items := make([]listItem, 0, len(children))
-	for _, child := range children {
-		items = append(items, listItem{
-			Name:        childName(child.Slug, slug),
-			Description: child.Description,
-		})
-	}
-	printAlignedList(w, items)
-}
-
-// printTopLevelList lists all top-level categories with their descriptions.
-func printTopLevelList(w io.Writer, idx *Index) {
-	cats := idx.TopLevel()
-
-	items := make([]listItem, 0, len(cats))
-	for _, cat := range cats {
-		items = append(items, listItem{
-			Name:        cat.Slug,
-			Description: cat.Description,
-		})
-	}
-	printAlignedList(w, items)
-}
-
 // searchGroupKey returns the grouping key for a search result.
 // JavaScript API sections group by module (second segment); others by first segment.
 func searchGroupKey(slug string) string {
@@ -297,24 +252,6 @@ func printBestPractices(afs fsext.Fs, w io.Writer, cacheDir, version string) err
 		_, _ = fmt.Fprintln(w)
 	}
 	return nil
-}
-
-// printAll prints all sections sequentially.
-func printAll(afs fsext.Fs, w io.Writer, idx *Index, cacheDir, version string) {
-	_, _ = fmt.Fprintf(w, "k6 Documentation (%s)\n", version)
-
-	for i := range idx.Sections {
-		sec := &idx.Sections[i]
-		content := readAndTransform(afs, cacheDir, sec.RelPath, version)
-		if content == "" {
-			continue
-		}
-		_, _ = fmt.Fprint(w, content)
-		if !strings.HasSuffix(content, "\n") {
-			_, _ = fmt.Fprintln(w)
-		}
-		_, _ = fmt.Fprintln(w)
-	}
 }
 
 // readMarkdown reads a markdown file from the cache directory.

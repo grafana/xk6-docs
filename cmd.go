@@ -40,8 +40,6 @@ Use search to find topics quickly.`,
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.list, "list", false, "List subtopics instead of showing content")
-	cmd.Flags().BoolVar(&opts.all, "all", false, "Print all documentation")
 	cmd.PersistentFlags().StringVar(&opts.version, "version", "", "Override k6 version for docs lookup")
 	cmd.PersistentFlags().StringVar(&opts.cacheDir, "cache-dir", "", "Override cache directory")
 
@@ -60,8 +58,6 @@ Use search to find topics quickly.`,
 }
 
 type docsOpts struct {
-	list     bool
-	all      bool
 	version  string
 	cacheDir string
 }
@@ -115,16 +111,6 @@ func runDocs(gs *state.GlobalState, cmd *cobra.Command, args []string, opts *doc
 		w = buf
 	}
 
-	if opts.all {
-		printAll(gs.FS, w, idx, cacheDir, version)
-		return pipeRenderer(cmd.Context(), buf, gs.Stdout.Writer, baseW, gs.Stderr, cfg.Renderer)
-	}
-
-	if opts.list && len(args) == 0 {
-		printTopLevelList(w, idx)
-		return pipeRenderer(cmd.Context(), buf, gs.Stdout.Writer, baseW, gs.Stderr, cfg.Renderer)
-	}
-
 	if len(args) == 0 {
 		printTOC(w, idx, version)
 		return pipeRenderer(cmd.Context(), buf, gs.Stdout.Writer, baseW, gs.Stderr, cfg.Renderer)
@@ -145,11 +131,6 @@ func runDocs(gs *state.GlobalState, cmd *cobra.Command, args []string, opts *doc
 	sec, ok := idx.Lookup(slug)
 	if !ok {
 		return fmt.Errorf("topic not found: %s", strings.Join(args, " "))
-	}
-
-	if opts.list {
-		printList(w, idx, slug)
-		return pipeRenderer(cmd.Context(), buf, gs.Stdout.Writer, baseW, gs.Stderr, cfg.Renderer)
 	}
 
 	printSection(gs.FS, w, idx, sec, cacheDir, version)

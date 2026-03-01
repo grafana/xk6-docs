@@ -13,9 +13,6 @@ user_invocable: true
 | `k6 x docs` | Show top-level categories (JavaScript API, using k6, etc.) |
 | `k6 x docs <topic>` | Show documentation for a specific topic |
 | `k6 x docs <topic> <subtopic>` | Show specific subtopic documentation |
-| `k6 x docs --list` | List all top-level categories |
-| `k6 x docs <topic> --list` | List subtopics of a topic |
-| `k6 x docs --all` | Show all documentation |
 | `k6 x docs search <term>` | Search documentation |
 | `k6 x docs best-practices` | Show k6 best practices guide |
 
@@ -40,7 +37,6 @@ The JavaScript API is the largest section. Key modules:
 
 ## Tips
 
-- Use `--list` flag to explore available subtopics before diving in
 - Use `search` for fuzzy finding when you don't know the exact path
 - The `best-practices` command gives a comprehensive guide for writing k6 scripts
 - Module names starting with `k6-` map to k6 JS modules (e.g., `k6-http` → `k6/http`)

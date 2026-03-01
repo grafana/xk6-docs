@@ -15,12 +15,6 @@ exec k6-docs --cache-dir $WORK/cache --version v0.55.x search k6
 cmp stdout golden-k6.txt
 ! stdout 'javascript-api:'
 
-# --list and --all flags not available on search subcommand
-! exec k6-docs --cache-dir $WORK/cache --version v0.55.x search --list k6
-stderr 'unknown flag'
-! exec k6-docs --cache-dir $WORK/cache --version v0.55.x search --all k6
-stderr 'unknown flag'
-
 -- golden-no-results.txt --
 Results for "zzzznotfound":
 
