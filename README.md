@@ -6,7 +6,9 @@
 **Look up any k6 doc instantly, right from your terminal.**
 
 > [!NOTE]
-> If you find this extension useful, please star the repo. Stars help us prioritize maintenance.
+> This extension is experimental and not officially supported by Grafana Labs.
+>
+> Star the repository to help us prioritize maintenance.
 
 A [k6 extension](https://grafana.com/docs/k6/latest/extensions/) for developers and AI agents who want to stay in the terminal.
 
