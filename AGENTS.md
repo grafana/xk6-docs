@@ -1,7 +1,8 @@
-**RULES:**
-1. **Update this file concisely** whenever features are added, removed, or changed.
-2. **TDD**: Always use red/green/refactor. Tests must compile and fail on assertions before writing implementation.
-3. **Plans**: Store plans in `.claude/plans/` with incrementing numbers (next: `7-<name>.md`).
+## RULES
+1. Update this file concisely whenever features are added, removed, or changed.
+2. Always use TDD (red/green/refactor). Tests must compile and fail on assertions before writing implementation.
+3. Never skip linters (`//nolint` without proof), trick the linter, change `go.mod` k6 floor below v1.5.0, add global vars or `init()` (except `register.go`).
+4. Plans: Store plans in `.claude/plans/` with incrementing numbers.
 
 ---
 
@@ -45,11 +46,6 @@
 - Outputs: `dist/sections.json`, `dist/markdown/**/*.md`, `dist/best_practices.md`.
 
 ### CI/CD
-- **CI** — lint + test + build on push/PR to main.
-- **Release bundle** — triggered by k6 release dispatch or manual. Clones k6-docs, runs prepare, compresses with `zstd --ultra -22`, publishes asset to the single `doc-bundles` GitHub release.
-- **Release poll** — manual fallback (schedule disabled). Polls k6 releases, builds if asset missing from the `doc-bundles` release.
-
-### Categories
-Canonical list defined once in `categories.go`: `javascript-api`, `using-k6`, `using-k6-browser`, `testing-guides`, `examples`, `results-output`, `reference`. The `reference` category is special-cased: only `reference/glossary` paths are included.
-
-`IsIncludedDocsPath(path)` is the single entry point for path inclusion checks — used by `cmd/prepare`, `transform.go` (link classification). `isCategory(name)` is used by `resolve.go` for category-prefix detection. Home dir resolution (`HOME` → `USERPROFILE` fallback) is consolidated in `homeDirFromEnv()` in `config.go`, shared by `configDir()` and `CacheDir()`.
+- CI: lint + test + build on push/PR to main.
+- Release bundle: triggered by k6 release dispatch or manual. Clones k6-docs, runs prepare, compresses with `zstd --ultra -22`, publishes asset to the single `doc-bundles` GitHub release.
+- Release poll: manual fallback (schedule disabled). Polls k6 releases, builds if asset missing from the `doc-bundles` release.
