@@ -24,8 +24,17 @@ func newDocsCmd(gs *state.GlobalState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "docs [topic] [subtopic...]",
 		Short: "Print k6 documentation",
-		Long:  "Access k6 documentation from the command line.",
-		Args:  cobra.ArbitraryArgs,
+		Long: `Offline k6 documentation in the terminal.
+
+Auto-downloads docs matching your k6 version on first run, then serves
+from cache. Topics resolve from space-separated args (e.g. "http get").
+Use search to find topics quickly.`,
+		Example: `  k6 x docs                        Show table of contents
+  k6 x docs http                   Read the HTTP module docs
+  k6 x docs http get               Read a specific topic
+  k6 x docs search websocket       Search across all docs
+  k6 x docs best-practices         Show best practices guide`,
+		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runDocs(gs, cmd, args, &opts)
 		},
@@ -39,6 +48,7 @@ func newDocsCmd(gs *state.GlobalState) *cobra.Command {
 	searchCmd := &cobra.Command{
 		Use:   "search <term>",
 		Short: "Search documentation",
+		Long:  "Fuzzy search across all topics (case-insensitive, ignores punctuation).",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runSearch(gs, cmd, args, &opts)

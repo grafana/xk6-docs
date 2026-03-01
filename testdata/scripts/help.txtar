@@ -1,11 +1,17 @@
 # Main command help text
 exec k6-docs --help
-stdout 'Access k6 documentation from the command line'
+stdout 'Offline k6 documentation'
+stdout 'Auto-downloads docs matching your k6 version'
+stdout 'Use search to find topics'
 stdout 'docs \[topic\] \[subtopic\.\.\.\]'
 stdout 'search'
 stdout '--list'
 stdout '--all'
+stdout 'k6 x docs http get'
+! stdout 'k6 x docs --list'
+! stdout 'k6 x docs http --list'
+! stdout 'k6 x docs --all'
 
 # Search subcommand help text
 exec k6-docs search --help
-stdout 'Search documentation'
+stdout 'Fuzzy search across all topics'
