@@ -234,7 +234,7 @@ func TestPrintSearchDepth(t *testing.T) {
 func newTestGlobalState(t *testing.T, afs fsext.Fs) *state.GlobalState {
 	t.Helper()
 
-	gs := state.NewGlobalState(context.Background())
+	gs := state.NewGlobalState(t.Context())
 	gs.FS = afs
 	gs.Env = map[string]string{}
 
