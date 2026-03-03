@@ -50,5 +50,6 @@
 
 ### CI/CD
 - CI: lint + test + build on push/PR to main.
+- Release: triggered by `vx.y.z` tag push. Builds k6 binaries (with this extension via xk6) for linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64. Publishes binaries + `checksums.txt` to a GitHub release.
 - Release bundle: triggered by k6 release dispatch or manual. Clones k6-docs, runs prepare, compresses with `zstd --ultra -22`, publishes asset to the single `doc-bundles` GitHub release.
 - Release poll: manual fallback (schedule disabled). Polls k6 releases, builds if asset missing from the `doc-bundles` release.
