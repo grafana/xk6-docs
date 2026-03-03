@@ -89,7 +89,7 @@ func prepareRun(gs *state.GlobalState, cmd *cobra.Command, opts *docsOpts) (*run
 	var buf *bytes.Buffer
 	w := baseW
 
-	if cfg.Renderer != "" && gs.Stdout.IsTTY {
+	if cfg.Renderer != "" && gs.Stdout.IsTTY && !gs.Flags.NoColor {
 		buf = &bytes.Buffer{}
 		w = buf
 	}

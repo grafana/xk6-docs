@@ -295,6 +295,44 @@ func TestRendererUsedWhenConfigured(t *testing.T) {
 	}
 }
 
+func TestRendererSkippedWhenNoColor(t *testing.T) {
+	t.Parallel()
+
+	afs, cacheDir := setupTestCache(t)
+	gs := newTestGlobalState(t, afs)
+	gs.Env["XDG_CONFIG_HOME"] = "/tmp/nocolor-config"
+	gs.Stdout.IsTTY = true
+	gs.Flags.NoColor = true
+
+	k6Dir := filepath.Join(gs.Env["XDG_CONFIG_HOME"], "k6")
+	if err := afs.MkdirAll(k6Dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := fsext.WriteFile(afs, filepath.Join(k6Dir, "docs.yaml"), []byte("renderer: cat -n\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdoutBuf bytes.Buffer
+	gs.Stdout.Writer = &stdoutBuf
+
+	var cmdBuf bytes.Buffer
+	cmd := newCmd(gs)
+	cmd.SetOut(&cmdBuf)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{"--cache-dir", cacheDir, "--version", "v0.55.x", "http", "get"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("cmd.Execute: %v", err)
+	}
+
+	if !strings.Contains(cmdBuf.String(), "http.get(url)") {
+		t.Errorf("expected raw output in cmd buffer, got: %s", cmdBuf.String())
+	}
+	if stdoutBuf.Len() != 0 {
+		t.Errorf("expected renderer stdout to be empty when --no-color, got: %s", stdoutBuf.String())
+	}
+}
+
 func TestRendererNotUsedWhenNotConfigured(t *testing.T) {
 	t.Parallel()
 
