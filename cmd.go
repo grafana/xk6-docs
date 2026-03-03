@@ -195,6 +195,8 @@ func setup(gs *state.GlobalState, versionFlag, cacheDirFlg string) (version, cac
 		}
 	}
 
+	version = MapToWildcard(version)
+
 	cacheDir = cacheDirFlg
 	if cacheDir == "" {
 		cacheDir = gs.Env["K6_DOCS_CACHE_DIR"]

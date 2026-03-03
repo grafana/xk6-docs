@@ -36,7 +36,7 @@
 ### Documentation version handling
 - Auto-detects k6 version from Go build info.
 - Maps to wildcard: `v1.5.0` → `v1.5.x`, `v1.6.0-rc.1` → `v1.6.x`.
-- Override via `--version` flag or `K6_DOCS_VERSION` env var.
+- Override via `--version` flag or `K6_DOCS_VERSION` env var (wildcard mapping is always applied, e.g. `--version 1.6.0` → `v1.6.x`).
 - Cache dir override via `--cache-dir` flag or `K6_DOCS_CACHE_DIR` env var.
 - `go.mod` floor for `go.k6.io/k6` must stay at v1.5.0 so Go's MVS doesn't override the k6 version users build with via xk6. Extension code can only use k6 APIs from v1.5.0; use build tags if newer APIs are needed.
 
