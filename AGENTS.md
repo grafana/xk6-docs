@@ -53,6 +53,7 @@
 - Never duplicate docs content (code examples, API descriptions). Only provide navigation paths and gotchas that save agents from trial-and-error.
 - Each reference is a single module/area workflow.
 - Before updating the skill, use `./k6 x docs` yourself to verify paths and discover gotchas.
+- Run `skills/k6-lookup-docs/scripts/validate-paths.sh ./k6` to find broken paths and uncovered modules.
 
 ### CI/CD
 - CI: lint + test + build on push/PR to main.
