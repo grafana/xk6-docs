@@ -85,9 +85,12 @@ func runSearch(gs *state.GlobalState, cmd *cobra.Command, args []string, opts *d
 		w = buf
 	}
 
-	env := &docsEnv{FS: gs.FS, CacheDir: cacheDir, Version: version}
-	term := strings.Join(args, " ")
-	printSearch(env, w, idx, term)
+	depth := cfg.Depth
+	if opts.depth > 0 {
+		depth = opts.depth
+	}
+	env := &docsEnv{FS: gs.FS, CacheDir: cacheDir, Version: version, Depth: depth}
+	printSearch(env, w, idx, args)
 	return pipeRenderer(cmd.Context(), buf, gs.Stdout.Writer, baseW, gs.Stderr, cfg.Renderer)
 }
 

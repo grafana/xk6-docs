@@ -174,6 +174,12 @@ func TestSearch(t *testing.T) {
 
 		requireSingleResult(t, idx.Search("http debugging", nil), "http-debugging")
 	})
+
+	t.Run("fuzzy: spaces match slashed slug", func(t *testing.T) {
+		t.Parallel()
+
+		requireSingleResult(t, idx.Search("browser closecontext", nil), "browser/closecontext")
+	})
 }
 
 func requireSingleResult(t *testing.T, results []*Section, wantSlug string) {

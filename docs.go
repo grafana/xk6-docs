@@ -149,8 +149,33 @@ func searchGroupKey(slug string) string {
 	return parts[0]
 }
 
+// searchResults collects results by searching for both the raw joined
+// term and the resolved slug (shared rules: k6-prefix, parent fallback).
+func searchResults(idx *Index, args []string, readContent func(string) string) []*Section {
+	exists := func(s string) bool { _, ok := idx.Lookup(s); return ok }
+
+	term := strings.Join(args, "/")
+	resolved := ResolveWithLookup(args, exists)
+
+	seen := make(map[string]*Section)
+	var results []*Section
+	for _, t := range []string{term, resolved} {
+		for _, sec := range idx.Search(t, readContent) {
+			if seen[sec.Slug] == nil {
+				seen[sec.Slug] = sec
+				results = append(results, sec)
+			}
+		}
+	}
+	return results
+}
+
 // printSearch prints search results as an indented tree, no descriptions.
-func printSearch(env *docsEnv, w io.Writer, idx *Index, term string) {
+// Args are normalized and resolved through the same rules as docs navigation
+// so that e.g. "browser page" and "k6-browser/page" produce the same results.
+func printSearch(env *docsEnv, w io.Writer, idx *Index, args []string) {
+	args = normalizeArgs(args)
+
 	readContent := func(slug string) string {
 		sec, ok := idx.Lookup(slug)
 		if !ok {
@@ -159,80 +184,96 @@ func printSearch(env *docsEnv, w io.Writer, idx *Index, term string) {
 		return env.readAndTransform(sec.RelPath)
 	}
 
-	results := idx.Search(term, readContent)
+	results := searchResults(idx, args, readContent)
 
 	if len(results) == 0 {
 		_, _ = fmt.Fprintln(w, "(no results)")
 		return
 	}
 
-	// Build a set of matched slugs and group results by parent topic.
-	matched := make(map[string]*Section, len(results))
-	groups := make(map[string][]*Section)
-	var groupOrder []string
-
-	for _, sec := range results {
-		matched[sec.Slug] = sec
-
-		// Skip bare "javascript-api" — it's the TOC default.
-		if sec.Slug == "javascript-api" {
-			continue
-		}
-
-		key := searchGroupKey(sec.Slug)
-		if _, exists := groups[key]; !exists {
-			groupOrder = append(groupOrder, key)
-		}
-		groups[key] = append(groups[key], sec)
-	}
-
-	// Sort groups alphabetically.
+	groups, groupOrder := groupSearchResults(results)
 	sort.Strings(groupOrder)
 
+	depth := env.Depth
 	var firstChildSlug string
 
 	for _, key := range groupOrder {
 		members := groups[key]
-
-		// Sort items within group alphabetically by slug.
 		sort.Slice(members, func(i, j int) bool {
 			return members[i].Slug < members[j].Slug
 		})
 
-		// Check if the group topic itself is a matched result.
-		// For JS API modules, the group slug is "javascript-api/{key}".
-		// For others, it's just "{key}".
-		groupSlug := key
-		if _, ok := idx.Lookup("javascript-api/" + key); ok {
-			if members[0].Slug == "javascript-api/"+key || strings.HasPrefix(members[0].Slug, "javascript-api/"+key+"/") {
-				groupSlug = "javascript-api/" + key
-			}
-		}
-
+		groupSlug := resolveGroupSlug(idx, key, members)
 		_, _ = fmt.Fprintf(w, "- %s\n", key)
 
-		// Collect children (items that aren't the group header itself).
-		// Deduplicate by child name.
-		seen := make(map[string]bool)
-		for _, sec := range members {
-			if sec.Slug == groupSlug {
-				continue
-			}
-			name := childName(sec.Slug, groupSlug)
-			if seen[name] {
-				continue
-			}
-			seen[name] = true
-			_, _ = fmt.Fprintf(w, "  - %s\n", name)
-			if firstChildSlug == "" {
-				firstChildSlug = sec.Slug
-			}
+		if depth < 2 {
+			continue
+		}
+
+		childSlug := printSearchChildren(w, idx, members, groupSlug, depth)
+		if firstChildSlug == "" {
+			firstChildSlug = childSlug
 		}
 	}
 
 	if firstChildSlug != "" {
 		printExample(w, "k6 x docs "+slugToArgs(firstChildSlug))
 	}
+}
+
+// groupSearchResults groups sections by their search group key.
+func groupSearchResults(results []*Section) (map[string][]*Section, []string) {
+	groups := make(map[string][]*Section)
+	var order []string
+
+	for _, sec := range results {
+		if sec.Slug == "javascript-api" {
+			continue
+		}
+		key := searchGroupKey(sec.Slug)
+		if _, exists := groups[key]; !exists {
+			order = append(order, key)
+		}
+		groups[key] = append(groups[key], sec)
+	}
+	return groups, order
+}
+
+// resolveGroupSlug determines the canonical slug for a search result group.
+func resolveGroupSlug(idx *Index, key string, members []*Section) string {
+	groupSlug := key
+	if _, ok := idx.Lookup("javascript-api/" + key); ok {
+		if members[0].Slug == "javascript-api/"+key || strings.HasPrefix(members[0].Slug, "javascript-api/"+key+"/") {
+			groupSlug = "javascript-api/" + key
+		}
+	}
+	return groupSlug
+}
+
+// printSearchChildren prints deduplicated children within a search group.
+// Returns the slug of the first child printed (for the example hint).
+func printSearchChildren(w io.Writer, idx *Index, members []*Section, groupSlug string, depth int) string {
+	seen := make(map[string]bool)
+	var firstSlug string
+	for _, sec := range members {
+		if sec.Slug == groupSlug {
+			continue
+		}
+		name := childName(sec.Slug, groupSlug)
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		_, _ = fmt.Fprintf(w, "  - %s\n", name)
+		if depth > 2 {
+			children := idx.Children(sec.Slug)
+			printTree(w, idx, children, sec.Slug, "    ", depth-2)
+		}
+		if firstSlug == "" {
+			firstSlug = sec.Slug
+		}
+	}
+	return firstSlug
 }
 
 // printBestPractices reads and prints the best_practices.md file from the cache.

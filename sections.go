@@ -56,11 +56,11 @@ func (idx *Index) Lookup(slug string) (*Section, bool) {
 	return sec, ok
 }
 
-// normalize strips spaces and dashes, then lowercases the result.
+// normalize strips separators (dashes, spaces, slashes), then lowercases.
 // This enables fuzzy matching where "close context", "close-context",
-// and "closecontext" all compare equal.
+// "close/context", and "closecontext" all compare equal.
 func normalize(s string) string {
-	return strings.ToLower(strings.NewReplacer("-", "", " ", "").Replace(s))
+	return strings.ToLower(strings.NewReplacer("-", "", " ", "", "/", "").Replace(s))
 }
 
 // Search returns sections whose title, description, slug, or body (via readContent)

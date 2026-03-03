@@ -12,7 +12,7 @@
 - `k6 x docs` prints `# k6 {version}` header followed by a depth-controlled bullet tree of categories and their children (default depth: 2), and a blockquote example hint. Depth is configurable via `depth` in `~/.config/k6/docs.yaml`.
 - `k6 x docs http get` resolves args to a slug (case-insensitive) and prints the cached markdown content (trimmed). If the topic has children, a `---` separator and `**{path} subtopics:**` section is appended with a depth-controlled bullet tree of children (same `depth` config), and a blockquote example hint using the slug path form (`k6 x docs {path}/<subtopic>`).
 - `k6 x docs best-practices` prints a curated guide (embedded in the prepare tool via `//go:embed`).
-- `k6 x docs search <query>` fuzzy searches (case-insensitive, ignores punctuation and spaces) and prints an indented tree: `- {group}` with `  - {child}` underneath, no descriptions. Footer shows `Example:` with a sample navigation command.
+- `k6 x docs search <query>` fuzzy searches (case-insensitive, ignores punctuation, spaces, slashes) and prints an indented tree: `- {group}` with `  - {child}` underneath, no descriptions. Footer shows `Example:` with a sample navigation command. Search uses the same arg normalization and resolve rules as docs navigation (shared `normalizeArgs` and `ResolveWithLookup`), so `search browser page`, `search browser/page`, and `search javascript-api browser page` all produce the same results. Configurable `depth` controls tree depth (same as TOC/section footers).
 
 ## Slug resolution
 - Args are normalized first: slashes are split so `browser/elementhandle` is treated identically to `browser elementhandle`.

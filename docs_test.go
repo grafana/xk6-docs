@@ -121,6 +121,93 @@ func TestPrintTree(t *testing.T) {
 	})
 }
 
+func TestPrintSearchArgs(t *testing.T) {
+	t.Parallel()
+
+	afs, dir := setupTestCache(t)
+	idx, err := LoadIndex(afs, dir)
+	if err != nil {
+		t.Fatalf("LoadIndex: %v", err)
+	}
+	env := &docsEnv{FS: afs, CacheDir: dir, Version: "v0.55.x", Depth: 2}
+
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "slash", args: []string{"k6-browser/page"}, want: "k6-browser"},
+		{name: "space", args: []string{"k6-browser", "page"}, want: "k6-browser"},
+		{name: "bare_slash", args: []string{"browser/page"}, want: "k6-browser"},
+		{name: "full_slug", args: []string{"javascript-api", "k6-browser", "page"}, want: "k6-browser"},
+		{name: "full_slug_bare", args: []string{"javascript-api", "browser", "page"}, want: "k6-browser"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var buf strings.Builder
+			printSearch(env, &buf, idx, tt.args)
+			if !strings.Contains(buf.String(), tt.want) {
+				t.Errorf("printSearch(%v) = %q, want substring %q", tt.args, buf.String(), tt.want)
+			}
+		})
+	}
+}
+
+func TestPrintSearchNoResults(t *testing.T) {
+	t.Parallel()
+
+	afs, dir := setupTestCache(t)
+	idx, err := LoadIndex(afs, dir)
+	if err != nil {
+		t.Fatalf("LoadIndex: %v", err)
+	}
+	env := &docsEnv{FS: afs, CacheDir: dir, Version: "v0.55.x", Depth: 2}
+
+	var buf strings.Builder
+	printSearch(env, &buf, idx, []string{"zzzznotfound"})
+	want := "(no results)\n"
+	if buf.String() != want {
+		t.Errorf("no results: got %q, want %q", buf.String(), want)
+	}
+}
+
+func TestPrintSearchDepth(t *testing.T) {
+	t.Parallel()
+
+	afs, dir := setupTestCache(t)
+	idx, err := LoadIndex(afs, dir)
+	if err != nil {
+		t.Fatalf("LoadIndex: %v", err)
+	}
+
+	t.Run("depth 1 shows only groups", func(t *testing.T) {
+		t.Parallel()
+		env := &docsEnv{FS: afs, CacheDir: dir, Version: "v0.55.x", Depth: 1}
+		var buf strings.Builder
+		printSearch(env, &buf, idx, []string{"k6-browser"})
+		got := buf.String()
+		if !strings.Contains(got, "- k6-browser\n") {
+			t.Errorf("depth 1: expected group header, got %q", got)
+		}
+		if strings.Contains(got, "  - ") {
+			t.Errorf("depth 1: should not show children, got %q", got)
+		}
+	})
+
+	t.Run("depth 2 shows groups and children", func(t *testing.T) {
+		t.Parallel()
+		env := &docsEnv{FS: afs, CacheDir: dir, Version: "v0.55.x", Depth: 2}
+		var buf strings.Builder
+		printSearch(env, &buf, idx, []string{"k6-browser"})
+		got := buf.String()
+		if !strings.Contains(got, "  - page") {
+			t.Errorf("depth 2: expected children, got %q", got)
+		}
+	})
+}
+
 // newTestGlobalState creates a GlobalState with an in-memory filesystem for unit tests.
 // Used by TTY-dependent tests in config_test.go that can't be tested via testscript.
 func newTestGlobalState(t *testing.T, afs fsext.Fs) *state.GlobalState {
@@ -152,7 +239,7 @@ func setupTestCache(t *testing.T) (fsext.Fs, string) {
 			Description: "k6 JavaScript API reference.",
 			Weight:      1,
 			Category:    "javascript-api",
-			Children:    []string{"javascript-api/k6-http", "javascript-api/jslib"},
+			Children:    []string{"javascript-api/k6-http", "javascript-api/k6-browser", "javascript-api/jslib"},
 			IsIndex:     true,
 		},
 		{
@@ -226,6 +313,26 @@ func setupTestCache(t *testing.T) (fsext.Fs, string) {
 			IsIndex:     true,
 		},
 		{
+			Slug:        "javascript-api/k6-browser",
+			RelPath:     "javascript-api/k6-browser/_index.md",
+			Title:       "k6/browser",
+			Description: "Browser module for k6.",
+			Weight:      4,
+			Category:    "javascript-api",
+			Children:    []string{"javascript-api/k6-browser/page"},
+			IsIndex:     true,
+		},
+		{
+			Slug:        "javascript-api/k6-browser/page",
+			RelPath:     "javascript-api/k6-browser/page.md",
+			Title:       "Page",
+			Description: "Represents a browser page.",
+			Weight:      1,
+			Category:    "javascript-api",
+			Children:    nil,
+			IsIndex:     false,
+		},
+		{
 			Slug:        "using-k6",
 			RelPath:     "using-k6/_index.md",
 			Title:       "Using k6",
@@ -284,6 +391,8 @@ func setupTestCache(t *testing.T) (fsext.Fs, string) {
 		"javascript-api/_index.md":                            "---\ntitle: 'JavaScript API'\n---\n# JavaScript API\n\nThe JavaScript API reference.\n",
 		"javascript-api/k6-http/_index.md":                    "---\ntitle: 'k6/http'\n---\n# k6/http\n\nThe HTTP module.\n",
 		"javascript-api/jslib/_index.md":                      "---\ntitle: 'jslib'\n---\n# jslib\n\nJavaScript utility library reference.\n",
+		"javascript-api/k6-browser/_index.md":                 "---\ntitle: 'k6/browser'\n---\n# k6/browser\n\nBrowser module.\n",
+		"javascript-api/k6-browser/page.md":                   "---\ntitle: 'Page'\n---\n# Page\n\nRepresents a browser page.\n",
 		"javascript-api/k6-http/get.md":                       "---\ntitle: 'get'\n---\n## http.get(url)\n\nMake a GET request.\n",
 		"javascript-api/k6-http/post.md":                      "---\ntitle: 'post'\n---\n## http.post(url, body)\n\nMake a POST request.\n",
 		"javascript-api/k6-http/k6-http-get.md":               "---\ntitle: 'get (alternate)'\n---\n## http.get(url) [alternate]\n\nAlternate GET endpoint.\n",
