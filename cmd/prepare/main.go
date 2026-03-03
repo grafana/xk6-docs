@@ -197,14 +197,11 @@ func buildSharedContentMap(afs fsext.Fs, sharedDir string) (map[string]string, e
 // parseFrontmatter extracts YAML frontmatter from content.
 func parseFrontmatter(content string) (frontmatter, error) {
 	var fm frontmatter
-	if !strings.HasPrefix(content, "---\n") {
+	yamlBlock, _, ok := docs.SplitFrontmatter(content)
+	if !ok {
 		return fm, nil
 	}
-	end := strings.Index(content[4:], "\n---")
-	if end == -1 {
-		return fm, nil
-	}
-	yamlBlock := deduplicateYAMLKeys(content[4 : 4+end])
+	yamlBlock = deduplicateYAMLKeys(yamlBlock)
 	if err := yaml.Unmarshal([]byte(yamlBlock), &fm); err != nil {
 		return fm, fmt.Errorf("parse yaml: %w", err)
 	}

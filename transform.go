@@ -157,17 +157,17 @@ func Transform(content, version string) string {
 	return s
 }
 
-// StripFrontmatter removes YAML frontmatter (delimited by "---") from the
-// start of content. If the content doesn't start with "---\n" or the closing
-// delimiter is missing, it returns the content unchanged.
-func StripFrontmatter(content string) string {
+// SplitFrontmatter splits content into the YAML block and the body after
+// the closing delimiter. If no valid frontmatter is found, yaml is empty,
+// body is the original content, and ok is false.
+func SplitFrontmatter(content string) (yamlBlock, body string, ok bool) {
 	if !strings.HasPrefix(content, "---\n") {
-		return content
+		return "", content, false
 	}
 
 	end := strings.Index(content[4:], "\n---")
 	if end == -1 {
-		return content
+		return "", content, false
 	}
 
 	// Skip past the closing "\n---" (4 bytes).
@@ -176,5 +176,13 @@ func StripFrontmatter(content string) string {
 	if cutAt < len(content) && content[cutAt] == '\n' {
 		cutAt++
 	}
-	return content[cutAt:]
+	return content[4 : 4+end], content[cutAt:], true
+}
+
+// StripFrontmatter removes YAML frontmatter (delimited by "---") from the
+// start of content. If the content doesn't start with "---\n" or the closing
+// delimiter is missing, it returns the content unchanged.
+func StripFrontmatter(content string) string {
+	_, body, _ := SplitFrontmatter(content)
+	return body
 }

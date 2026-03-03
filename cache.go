@@ -50,7 +50,8 @@ func EnsureDocs(afs fsext.Fs, env map[string]string, version string, httpClient 
 		return "", err
 	}
 
-	if IsCached(afs, env, version) {
+	info, statErr := afs.Stat(filepath.Clean(dir))
+	if statErr == nil && info.IsDir() {
 		return dir, nil
 	}
 

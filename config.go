@@ -9,6 +9,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const defaultDepth = 2
+
 // docsConfig holds user configuration for the docs subcommand.
 type docsConfig struct {
 	Renderer string `yaml:"renderer"`
@@ -47,13 +49,13 @@ func configDir(env map[string]string) (string, error) {
 func loadConfig(afs fsext.Fs, env map[string]string) (docsConfig, error) {
 	dir, err := configDir(env)
 	if err != nil {
-		return docsConfig{Depth: 2}, err
+		return docsConfig{Depth: defaultDepth}, err
 	}
 
 	data, err := fsext.ReadFile(afs, filepath.Join(dir, "docs.yaml"))
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return docsConfig{Depth: 2}, nil
+			return docsConfig{Depth: defaultDepth}, nil
 		}
 		return docsConfig{}, err
 	}
@@ -64,7 +66,7 @@ func loadConfig(afs fsext.Fs, env map[string]string) (docsConfig, error) {
 	}
 
 	if cfg.Depth == 0 {
-		cfg.Depth = 2
+		cfg.Depth = defaultDepth
 	}
 
 	return cfg, nil
