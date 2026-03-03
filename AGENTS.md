@@ -48,6 +48,12 @@
 - Populates parent→child relationships.
 - Outputs: `dist/sections.json`, `dist/markdown/**/*.md`, `dist/best_practices.md`.
 
+### Agent skill (`skills/k6-lookup-docs/`)
+- Installable via `npx skills add grafana/xk6-subcommand-docs`. Agent-independent (works with Claude Code, Cursor, Codex, etc.).
+- Never duplicate docs content (code examples, API descriptions). Only provide navigation paths and gotchas that save agents from trial-and-error.
+- Each reference is a single module/area workflow.
+- Before updating the skill, use `./k6 x docs` yourself to verify paths and discover gotchas.
+
 ### CI/CD
 - CI: lint + test + build on push/PR to main.
 - Release: triggered by `vx.y.z` tag push. Builds k6 binaries (with this extension via xk6) for linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64. Publishes binaries + `checksums.txt` to a GitHub release.

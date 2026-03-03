@@ -1,0 +1,17 @@
+{
+  "name": "k6-lookup-docs",
+  "description": "Look up k6 documentation to write load tests, browser tests, and performance scripts",
+  "version": "0.1.0",
+  "author": {
+    "name": "Grafana k6"
+  },
+  "license": "AGPL-3.0",
+  "keywords": [
+    "k6",
+    "load-testing",
+    "performance",
+    "documentation",
+    "grafana"
+  ],
+  "skills": "./skills/"
+}

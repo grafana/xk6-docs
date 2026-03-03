@@ -50,12 +50,14 @@ For a nicer reading experience, configure a markdown renderer in `~/.config/k6/d
 renderer: glow -p 200
 ```
 
-## Teach your AI agent how to use k6 effectively
+## Agent Skill
 
-Spend less tokens and context (= less costs + better AI performance), and fast answers.
+An [agent skill](https://agentskills.io) is included so AI coding agents can look up k6 docs efficiently — fewer commands, no guessing paths, no wasted tokens.
+
+Works with Claude Code, Cursor, Codex, Gemini CLI, OpenCode, GitHub Copilot, and [35+ other agents](https://agentskills.io).
 
 ```bash
-npx @anthropic-ai/claude-code skill install --url https://github.com/grafana/xk6-subcommand-docs
+npx skills add grafana/xk6-subcommand-docs
 ```
 
 ## Development
