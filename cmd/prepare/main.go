@@ -63,7 +63,7 @@ func run(
 	afs fsext.Fs, stderr io.Writer,
 ) error {
 	// Step 1: ensure we have the k6-docs repo.
-	docsPath, cleanup, err := ensureDocsRepo(k6DocsPath, afs, stderr)
+	docsPath, cleanup, err := ensureDocsRepo(k6DocsPath, defaultRepoURL, afs, stderr)
 	if err != nil {
 		return err
 	}
@@ -113,10 +113,12 @@ func run(
 	return nil
 }
 
+const defaultRepoURL = "https://github.com/grafana/k6-docs.git"
+
 // ensureDocsRepo returns the path to the k6-docs repo. If k6DocsPath is empty,
-// it clones the repo into a temp directory and returns a cleanup function.
+// it clones from repoURL into a temp directory and returns a cleanup function.
 func ensureDocsRepo(
-	k6DocsPath string, afs fsext.Fs, stderr io.Writer,
+	k6DocsPath, repoURL string, afs fsext.Fs, stderr io.Writer,
 ) (string, func(), error) {
 	if k6DocsPath != "" {
 		return k6DocsPath, nil, nil
@@ -128,9 +130,9 @@ func ensureDocsRepo(
 	}
 
 	log.Println("Cloning k6-docs repository...")
+	//nolint:gosec // G204: repoURL is either the hardcoded defaultRepoURL constant or a test-controlled local path.
 	cmd := exec.CommandContext(context.Background(),
-		"git", "clone", "--depth", "1",
-		"https://github.com/grafana/k6-docs.git", ".")
+		"git", "clone", "--depth", "1", repoURL, ".")
 	cmd.Dir = tmpDir
 	cmd.Stdout = stderr
 	cmd.Stderr = stderr

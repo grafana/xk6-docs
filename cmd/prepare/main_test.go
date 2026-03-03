@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -907,29 +908,28 @@ func TestRunWithExactVersion(t *testing.T) {
 func TestEnsureDocsRepoAutoClone(t *testing.T) {
 	t.Parallel()
 
-	// ensureDocsRepo clones from github.com/grafana/k6-docs when path is empty.
-	// This requires network access. Skip if no network.
+	// Create a local bare git repo to clone from instead of hitting GitHub.
+	localRepo := t.TempDir()
+	setupLocalGitRepo(t, localRepo)
+
 	afs := fsext.NewOsFs()
 	var stderr bytes.Buffer
 
-	path, cleanup, err := ensureDocsRepo("", afs, &stderr)
+	path, cleanup, err := ensureDocsRepo("", localRepo, afs, &stderr)
 	if err != nil {
-		// If clone fails (no network), skip rather than fail.
-		t.Skipf("ensureDocsRepo clone failed (no network?): %v", err)
+		t.Fatalf("ensureDocsRepo: %v", err)
 	}
 
-	// Verify it cloned something.
 	if path == "" {
 		t.Fatal("ensureDocsRepo returned empty path")
 	}
 
-	// Verify the cloned directory exists and has docs.
+	// Verify the cloned directory has the expected structure.
 	docsDir := filepath.Join(path, "docs")
 	if _, statErr := os.Stat(docsDir); statErr != nil {
 		t.Errorf("cloned repo missing docs/ directory: %v", statErr)
 	}
 
-	// Verify stderr mentions cloning.
 	if !strings.Contains(stderr.String(), "Cloning") {
 		t.Error("expected 'Cloning' in stderr output")
 	}
@@ -940,5 +940,30 @@ func TestEnsureDocsRepoAutoClone(t *testing.T) {
 	}
 	if _, statErr := os.Stat(path); statErr == nil {
 		t.Error("cleanup should have removed the cloned directory")
+	}
+}
+
+// setupLocalGitRepo creates a minimal git repo with a docs/ directory
+// so ensureDocsRepo can clone it locally instead of hitting GitHub.
+func setupLocalGitRepo(t *testing.T, dir string) {
+	t.Helper()
+
+	if err := os.MkdirAll(filepath.Join(dir, "docs"), 0o755); err != nil {
+		t.Fatalf("mkdir docs: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "docs", ".gitkeep"), nil, 0o644); err != nil {
+		t.Fatalf("write .gitkeep: %v", err)
+	}
+
+	for _, args := range [][]string{
+		{"git", "init"},
+		{"git", "add", "."},
+		{"git", "-c", "user.name=test", "-c", "user.email=test@test", "commit", "-m", "init"},
+	} {
+		cmd := exec.CommandContext(t.Context(), args[0], args[1:]...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%v: %v\n%s", args, err, out)
+		}
 	}
 }
