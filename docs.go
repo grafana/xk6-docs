@@ -10,6 +10,21 @@ import (
 	"go.k6.io/k6/lib/fsext"
 )
 
+// docsEnv bundles the context needed for reading and transforming docs.
+type docsEnv struct {
+	FS       fsext.Fs
+	CacheDir string
+	Version  string
+}
+
+func (env *docsEnv) readAndTransform(relPath string) string {
+	raw := readMarkdown(env.FS, env.CacheDir, relPath)
+	if raw == "" {
+		return ""
+	}
+	return Transform(raw, env.Version)
+}
+
 // childName returns the short name of a child relative to its parent.
 // If the child slug starts with parentSlug+"/", the prefix is stripped.
 // Then, if the remaining name starts with the parent's last segment + "-",
@@ -57,6 +72,31 @@ func printSubtopics(w io.Writer, path string, names []string) {
 	printExample(w, fmt.Sprintf("k6 x docs %s/<subtopic>", path))
 }
 
+// showDocs resolves args to a topic and prints it.
+func showDocs(env *docsEnv, w io.Writer, idx *Index, args []string) error {
+	if len(args) == 0 {
+		printTOC(w, idx, env.Version)
+		return nil
+	}
+
+	if args[0] == "best-practices" {
+		return printBestPractices(env, w)
+	}
+
+	slug := ResolveWithLookup(args, func(s string) bool {
+		_, ok := idx.Lookup(s)
+		return ok
+	})
+
+	sec, ok := idx.Lookup(slug)
+	if !ok {
+		return fmt.Errorf("topic not found: %s", strings.Join(args, " "))
+	}
+
+	printSection(env, w, idx, sec)
+	return nil
+}
+
 // printTOC prints the table of contents as a flat slug list.
 func printTOC(w io.Writer, idx *Index, version string) {
 	_, _ = fmt.Fprintf(w, "# k6 %s\n", version)
@@ -70,8 +110,8 @@ func printTOC(w io.Writer, idx *Index, version string) {
 
 // printSection prints a section's markdown content, read from the cache dir.
 // If the section has children, a subtopics footer is appended.
-func printSection(afs fsext.Fs, w io.Writer, idx *Index, section *Section, cacheDir, version string) {
-	content := strings.TrimSpace(readAndTransform(afs, cacheDir, section.RelPath, version))
+func printSection(env *docsEnv, w io.Writer, idx *Index, section *Section) {
+	content := strings.TrimSpace(env.readAndTransform(section.RelPath))
 	if content != "" {
 		_, _ = fmt.Fprintln(w, content)
 	}
@@ -104,13 +144,13 @@ func searchGroupKey(slug string) string {
 }
 
 // printSearch prints search results as an indented tree, no descriptions.
-func printSearch(afs fsext.Fs, w io.Writer, idx *Index, term, cacheDir, version string) {
+func printSearch(env *docsEnv, w io.Writer, idx *Index, term string) {
 	readContent := func(slug string) string {
 		sec, ok := idx.Lookup(slug)
 		if !ok {
 			return ""
 		}
-		return readAndTransform(afs, cacheDir, sec.RelPath, version)
+		return env.readAndTransform(sec.RelPath)
 	}
 
 	results := idx.Search(term, readContent)
@@ -190,13 +230,13 @@ func printSearch(afs fsext.Fs, w io.Writer, idx *Index, term, cacheDir, version 
 }
 
 // printBestPractices reads and prints the best_practices.md file from the cache.
-func printBestPractices(afs fsext.Fs, w io.Writer, cacheDir, version string) error {
-	path := filepath.Join(cacheDir, "best_practices.md")
-	data, err := fsext.ReadFile(afs, path)
+func printBestPractices(env *docsEnv, w io.Writer) error {
+	path := filepath.Join(env.CacheDir, "best_practices.md")
+	data, err := fsext.ReadFile(env.FS, path)
 	if err != nil {
 		return fmt.Errorf("read best practices: %w", err)
 	}
-	content := Transform(string(data), version)
+	content := Transform(string(data), env.Version)
 	_, _ = fmt.Fprint(w, content)
 	if !strings.HasSuffix(content, "\n") {
 		_, _ = fmt.Fprintln(w)
@@ -212,13 +252,4 @@ func readMarkdown(afs fsext.Fs, cacheDir, relPath string) string {
 		return ""
 	}
 	return string(data)
-}
-
-// readAndTransform reads a markdown file and applies runtime transforms.
-func readAndTransform(afs fsext.Fs, cacheDir, relPath, version string) string {
-	raw := readMarkdown(afs, cacheDir, relPath)
-	if raw == "" {
-		return ""
-	}
-	return Transform(raw, version)
 }

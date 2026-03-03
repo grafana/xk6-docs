@@ -83,8 +83,9 @@ func runSearch(gs *state.GlobalState, cmd *cobra.Command, args []string, opts *d
 		w = buf
 	}
 
+	env := &docsEnv{FS: gs.FS, CacheDir: cacheDir, Version: version}
 	term := strings.Join(args, " ")
-	printSearch(gs.FS, w, idx, term, cacheDir, version)
+	printSearch(env, w, idx, term)
 	return pipeRenderer(cmd.Context(), buf, gs.Stdout.Writer, baseW, gs.Stderr, cfg.Renderer)
 }
 
@@ -94,8 +95,7 @@ func runDocs(gs *state.GlobalState, cmd *cobra.Command, args []string, opts *doc
 		return err
 	}
 
-	isTTY := gs.Stdout.IsTTY
-	logMode(gs, isTTY)
+	logMode(gs, gs.Stdout.IsTTY)
 
 	cfg, cfgErr := loadConfig(gs.FS, gs.Env)
 	if cfgErr != nil && gs != nil {
@@ -106,34 +106,15 @@ func runDocs(gs *state.GlobalState, cmd *cobra.Command, args []string, opts *doc
 	var buf *bytes.Buffer
 	w := baseW
 
-	if cfg.Renderer != "" && isTTY {
+	if cfg.Renderer != "" && gs.Stdout.IsTTY {
 		buf = &bytes.Buffer{}
 		w = buf
 	}
 
-	if len(args) == 0 {
-		printTOC(w, idx, version)
-		return pipeRenderer(cmd.Context(), buf, gs.Stdout.Writer, baseW, gs.Stderr, cfg.Renderer)
+	env := &docsEnv{FS: gs.FS, CacheDir: cacheDir, Version: version}
+	if err := showDocs(env, w, idx, args); err != nil {
+		return err
 	}
-
-	if args[0] == "best-practices" {
-		if err := printBestPractices(gs.FS, w, cacheDir, version); err != nil {
-			return err
-		}
-		return pipeRenderer(cmd.Context(), buf, gs.Stdout.Writer, baseW, gs.Stderr, cfg.Renderer)
-	}
-
-	slug := ResolveWithLookup(args, func(s string) bool {
-		_, ok := idx.Lookup(s)
-		return ok
-	})
-
-	sec, ok := idx.Lookup(slug)
-	if !ok {
-		return fmt.Errorf("topic not found: %s", strings.Join(args, " "))
-	}
-
-	printSection(gs.FS, w, idx, sec, cacheDir, version)
 	return pipeRenderer(cmd.Context(), buf, gs.Stdout.Writer, baseW, gs.Stderr, cfg.Renderer)
 }
 
