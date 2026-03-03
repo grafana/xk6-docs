@@ -64,46 +64,24 @@ type docsOpts struct {
 	depth    int
 }
 
-func runSearch(gs *state.GlobalState, cmd *cobra.Command, args []string, opts *docsOpts) error {
+// runCtx holds the common state prepared by prepareRun for both docs and search.
+type runCtx struct {
+	env   *docsEnv
+	idx   *Index
+	w     io.Writer
+	flush func() error
+}
+
+// prepareRun handles setup shared by runDocs and runSearch:
+// version/cache resolution, config loading, depth, and renderer buffering.
+func prepareRun(gs *state.GlobalState, cmd *cobra.Command, opts *docsOpts) (*runCtx, error) {
 	version, cacheDir, idx, err := setup(gs, opts.version, opts.cacheDir)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	cfg, cfgErr := loadConfig(gs.FS, gs.Env)
 	if cfgErr != nil {
-		gs.Logger.Warnf("docs: ignoring invalid config: %v", cfgErr)
-	}
-
-	isTTY := gs.Stdout.IsTTY
-	baseW := cmd.OutOrStdout()
-	var buf *bytes.Buffer
-	w := baseW
-
-	if cfg.Renderer != "" && isTTY {
-		buf = &bytes.Buffer{}
-		w = buf
-	}
-
-	depth := cfg.Depth
-	if opts.depth > 0 {
-		depth = opts.depth
-	}
-	env := &docsEnv{FS: gs.FS, CacheDir: cacheDir, Version: version, Depth: depth}
-	printSearch(env, w, idx, args)
-	return pipeRenderer(cmd.Context(), buf, gs.Stdout.Writer, baseW, gs.Stderr, cfg.Renderer)
-}
-
-func runDocs(gs *state.GlobalState, cmd *cobra.Command, args []string, opts *docsOpts) error {
-	version, cacheDir, idx, err := setup(gs, opts.version, opts.cacheDir)
-	if err != nil {
-		return err
-	}
-
-	logMode(gs, gs.Stdout.IsTTY)
-
-	cfg, cfgErr := loadConfig(gs.FS, gs.Env)
-	if cfgErr != nil && gs != nil {
 		gs.Logger.Warnf("docs: ignoring invalid config: %v", cfgErr)
 	}
 
@@ -120,11 +98,34 @@ func runDocs(gs *state.GlobalState, cmd *cobra.Command, args []string, opts *doc
 	if opts.depth > 0 {
 		depth = opts.depth
 	}
+
 	env := &docsEnv{FS: gs.FS, CacheDir: cacheDir, Version: version, Depth: depth}
-	if err := showDocs(env, w, idx, args); err != nil {
+	flush := func() error {
+		return pipeRenderer(cmd.Context(), buf, gs.Stdout.Writer, baseW, gs.Stderr, cfg.Renderer)
+	}
+
+	return &runCtx{env: env, idx: idx, w: w, flush: flush}, nil
+}
+
+func runSearch(gs *state.GlobalState, cmd *cobra.Command, args []string, opts *docsOpts) error {
+	rc, err := prepareRun(gs, cmd, opts)
+	if err != nil {
 		return err
 	}
-	return pipeRenderer(cmd.Context(), buf, gs.Stdout.Writer, baseW, gs.Stderr, cfg.Renderer)
+	printSearch(rc.env, rc.w, rc.idx, args)
+	return rc.flush()
+}
+
+func runDocs(gs *state.GlobalState, cmd *cobra.Command, args []string, opts *docsOpts) error {
+	rc, err := prepareRun(gs, cmd, opts)
+	if err != nil {
+		return err
+	}
+	logMode(gs, gs.Stdout.IsTTY)
+	if err := showDocs(rc.env, rc.w, rc.idx, args); err != nil {
+		return err
+	}
+	return rc.flush()
 }
 
 func logMode(gs *state.GlobalState, isTTY bool) {
