@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	docs "github.com/grafana/xk6-subcommand-docs"
 	"go.k6.io/k6/lib/fsext"
@@ -130,8 +131,10 @@ func ensureDocsRepo(
 	}
 
 	log.Println("Cloning k6-docs repository...")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
 	//nolint:gosec // G204: repoURL is either the hardcoded defaultRepoURL constant or a test-controlled local path.
-	cmd := exec.CommandContext(context.Background(),
+	cmd := exec.CommandContext(ctx,
 		"git", "clone", "--depth", "1", repoURL, ".")
 	cmd.Dir = tmpDir
 	cmd.Stdout = stderr
