@@ -2,17 +2,50 @@ package docs
 
 import "testing"
 
-func TestResolveSlashInLaterArg(t *testing.T) {
+func TestResolveSlashInArg(t *testing.T) {
 	t.Parallel()
 
-	// Rule 1: when any arg contains "/", all args are joined with "/".
-	// If the slash is in a later arg (not args[0]), the joined result
-	// is unlikely to match any real slug. This can't be proven through
-	// command output because the error message uses the original args
-	// joined by space, making it indistinguishable from a Rule 3 failure.
-	got := Resolve([]string{"http", "k6-http/get"})
-	want := "http/k6-http/get"
-	if got != want {
-		t.Errorf("Resolve([http, k6-http/get]) = %q, want %q", got, want)
+	known := map[string]bool{
+		"javascript-api/k6-browser/elementhandle": true,
+		"javascript-api/k6-http/get":              true,
+		"using-k6/scenarios":                      true,
+	}
+	exists := func(s string) bool { return known[s] }
+
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "slash_shorthand",
+			args: []string{"browser/elementhandle"},
+			want: "javascript-api/k6-browser/elementhandle",
+		},
+		{
+			name: "space_shorthand",
+			args: []string{"browser", "elementhandle"},
+			want: "javascript-api/k6-browser/elementhandle",
+		},
+		{
+			name: "full_slug",
+			args: []string{"javascript-api/k6-http/get"},
+			want: "javascript-api/k6-http/get",
+		},
+		{
+			name: "category_slash",
+			args: []string{"using-k6/scenarios"},
+			want: "using-k6/scenarios",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := ResolveWithLookup(tt.args, exists)
+			if got != tt.want {
+				t.Errorf("ResolveWithLookup(%v) = %q, want %q", tt.args, got, tt.want)
+			}
+		})
 	}
 }

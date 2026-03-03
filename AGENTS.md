@@ -17,6 +17,7 @@
 ## Slug resolution
 - `k6 x docs http get` → `javascript-api/k6-http/get`
 - `k6 x docs javascript-api/k6-http/get` → `javascript-api/k6-http/get`
+- `k6 x docs browser/elementhandle` → `javascript-api/k6-browser/elementhandle` (slash args normalized to space args before resolving)
 - `k6 x docs using-k6 scenarios` → `using-k6/scenarios`
 - Parent-prefix fallback: `k6 x docs http cookiejar clear` → tries `.../cookiejar/clear` (miss) → `.../cookiejar/cookiejar-clear` (hit). Handled by `withParentFallback` in `resolve.go`.
 

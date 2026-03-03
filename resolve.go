@@ -24,12 +24,17 @@ func ResolveWithLookup(args []string, exists func(string) bool) string {
 		return ""
 	}
 
-	// Rule 1: if any arg contains "/", treat as a full slug.
+	// Normalize: split all args on "/" so "browser/elementhandle"
+	// resolves the same way as "browser" "elementhandle".
+	var flat []string
 	for _, a := range args {
-		if strings.Contains(a, "/") {
-			return strings.Join(args, "/")
+		for part := range strings.SplitSeq(a, "/") {
+			if part != "" {
+				flat = append(flat, part)
+			}
 		}
 	}
+	args = flat
 
 	// Rule 2: first word matches a known category prefix → join all words.
 	if isCategory(args[0]) {
