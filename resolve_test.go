@@ -8,6 +8,7 @@ func TestResolveSlashInArg(t *testing.T) {
 	known := map[string]bool{
 		"javascript-api/k6-browser/elementhandle": true,
 		"javascript-api/k6-http/get":              true,
+		"javascript-api/jslib":                    true,
 		"using-k6/scenarios":                      true,
 	}
 	exists := func(s string) bool { return known[s] }
@@ -31,6 +32,16 @@ func TestResolveSlashInArg(t *testing.T) {
 			name: "full_slug",
 			args: []string{"javascript-api/k6-http/get"},
 			want: "javascript-api/k6-http/get",
+		},
+		{
+			name: "full_slug_without_k6_prefix",
+			args: []string{"javascript-api/browser/elementhandle"},
+			want: "javascript-api/k6-browser/elementhandle",
+		},
+		{
+			name: "existing_doc_prioritized_over_k6_prefix",
+			args: []string{"jslib"},
+			want: "javascript-api/jslib",
 		},
 		{
 			name: "category_slash",

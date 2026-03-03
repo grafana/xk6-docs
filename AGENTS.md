@@ -15,10 +15,12 @@
 - `k6 x docs search <query>` fuzzy searches (case-insensitive, ignores punctuation and spaces) and prints an indented tree: `- {group}` with `  - {child}` underneath, no descriptions. Footer shows `Example:` with a sample navigation command.
 
 ## Slug resolution
+- Args are normalized first: slashes are split so `browser/elementhandle` is treated identically to `browser elementhandle`.
 - `k6 x docs http get` → `javascript-api/k6-http/get`
 - `k6 x docs javascript-api/k6-http/get` → `javascript-api/k6-http/get`
-- `k6 x docs browser/elementhandle` → `javascript-api/k6-browser/elementhandle` (slash args normalized to space args before resolving)
+- `k6 x docs javascript-api/browser/elementhandle` → `javascript-api/k6-browser/elementhandle`
 - `k6 x docs using-k6 scenarios` → `using-k6/scenarios`
+- k6-prefix fallback: `withK6Prefix` in `resolve.go` inserts `k6-` on the second segment of any `javascript-api/` slug when the original doesn't exist. Existing docs are prioritized (e.g. `jslib` stays as-is since `javascript-api/jslib` exists).
 - Parent-prefix fallback: `k6 x docs http cookiejar clear` → tries `.../cookiejar/clear` (miss) → `.../cookiejar/cookiejar-clear` (hit). Handled by `withParentFallback` in `resolve.go`.
 
 ### Rendering

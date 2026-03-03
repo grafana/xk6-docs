@@ -3,7 +3,7 @@ package docs
 import "strings"
 
 // Resolve converts CLI args into a canonical documentation slug.
-// It always assumes the k6- prefix for Rule 3 (JS API shortcuts).
+// It always assumes the k6- prefix for JS API shortcuts.
 // Use [ResolveWithLookup] when an index is available to handle
 // slugs that don't carry the k6- prefix (e.g. jslib, crypto).
 func Resolve(args []string) string {
@@ -11,14 +11,12 @@ func Resolve(args []string) string {
 }
 
 // ResolveWithLookup converts CLI args into a canonical documentation slug.
-// When exists is non-nil, Rule 3 uses it to disambiguate javascript-api
-// children that may or may not carry the k6- prefix.
+// When exists is non-nil, it disambiguates javascript-api children that
+// may or may not carry the k6- prefix.
 //
-// If the user typed "k6-http", it always resolves to javascript-api/k6-http.
-// If the user typed a bare name like "jslib" or "crypto", the function tries
-// the unprefixed slug first (javascript-api/crypto), then falls back to the
-// k6-prefixed form (javascript-api/k6-crypto). This handles pages like jslib,
-// crypto, init-context, and error-codes that don't use the k6- prefix.
+// The k6- prefix fallback is handled in a single place (withK6Prefix)
+// and applies to all javascript-api slugs regardless of how they were
+// constructed (shorthand or full path).
 func ResolveWithLookup(args []string, exists func(string) bool) string {
 	if len(args) == 0 {
 		return ""
@@ -36,35 +34,50 @@ func ResolveWithLookup(args []string, exists func(string) bool) string {
 	}
 	args = flat
 
-	// Rule 2: first word matches a known category prefix → join all words.
+	var slug string
+
 	if isCategory(args[0]) {
-		return strings.Join(args, "/")
+		slug = strings.Join(args, "/")
+	} else {
+		// JS API module shortcut: strip k6- prefix (if present) and
+		// build the base javascript-api/ slug. The k6- prefix fallback
+		// below handles re-adding it when needed.
+		name := strings.TrimPrefix(args[0], "k6-")
+		rest := args[1:]
+		parts := append([]string{name}, rest...)
+		slug = "javascript-api/" + strings.Join(parts, "/")
 	}
 
-	// Rule 3: JS API module shortcut.
-	hasK6Prefix := strings.HasPrefix(args[0], "k6-")
-	name := strings.TrimPrefix(args[0], "k6-")
-	rest := args[1:]
-	parts := append([]string{name}, rest...)
-	prefixed := "javascript-api/k6-" + strings.Join(parts, "/")
+	slug = withK6Prefix(slug, exists)
+	return withParentFallback(slug, exists)
+}
 
-	if exists == nil || hasK6Prefix {
-		// No lookup available, or user explicitly typed k6- prefix.
-		return prefixed
+// withK6Prefix tries inserting "k6-" on the second segment of a
+// javascript-api/ slug. If the original slug already exists, it is
+// returned as-is (existing docs are prioritized over the k6- form).
+// Without a lookup function, it defaults to the k6-prefixed form
+// since most JS API modules use it.
+func withK6Prefix(slug string, exists func(string) bool) string {
+	const prefix = "javascript-api/"
+	if !strings.HasPrefix(slug, prefix) {
+		return slug
+	}
+	rest := slug[len(prefix):]
+	if strings.HasPrefix(rest, "k6-") {
+		return slug
 	}
 
-	// User typed a bare name: try unprefixed first (exact match), then k6- prefixed.
-	unprefixed := "javascript-api/" + strings.Join(parts, "/")
-	if exists(unprefixed) {
-		return unprefixed
-	}
+	candidate := prefix + "k6-" + rest
 
-	if exists(prefixed) {
-		return prefixed
+	if exists == nil {
+		return candidate
 	}
-
-	// Neither found — try parent-prefix fallback, then return prefixed as default.
-	return withParentFallback(prefixed, exists)
+	if exists(slug) {
+		return slug
+	}
+	// Return k6-prefixed form: either it exists, or it's the better
+	// default for further fallbacks (most JS API modules use k6-).
+	return candidate
 }
 
 // withParentFallback retries a slug by prepending the parent segment name
