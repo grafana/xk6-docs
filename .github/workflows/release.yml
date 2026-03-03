@@ -29,13 +29,14 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: Install xk6
+        run: go install go.k6.io/xk6/cmd/xk6@latest
       - name: Build
         env:
           CGO_ENABLED: "0"
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
-          go install go.k6.io/xk6/cmd/xk6@latest
           EXT=""
           if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
           xk6 build --output "k6-${GOOS}-${GOARCH}${EXT}" \
