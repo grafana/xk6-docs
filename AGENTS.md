@@ -9,10 +9,10 @@
 `k6 x docs` — offline k6 documentation in the terminal. For humans and AI agents. Docs are not embedded in the binary. On first run, the extension detects the k6 version from build info, downloads a matching compressed doc bundle (`.tar.zst`) from GitHub releases, and caches it locally (`~/.local/share/k6/docs/{version}/`). Subsequent runs serve from cache with no network. A separate standalone prepare tool (`cmd/prepare/`) builds these bundles by cloning the k6-docs Hugo repository, transforming markdown into CLI-friendly format, building a searchable index (`sections.json`), and compressing everything. CI auto-publishes bundles as assets under a single `doc-bundles` GitHub release.
 
 ## Browsing
-- `k6 x docs` shows categories with children and truncated descriptions (80 char max). Each category has a usage hint footer.
-- `k6 x docs http get` resolves args to a slug (case-insensitive), reads the cached markdown, and prints it. If the topic has children, a subtopics footer is appended with comma-separated child names (redundant parent prefix stripped, e.g. `cookiejar-clear` → `clear`) and a usage hint showing the full CLI path via `slugToArgs`.
+- `k6 x docs` prints `# k6 {version}` header followed by a flat bullet list of top-level category slugs (`- {slug}`) and a blockquote example hint.
+- `k6 x docs http get` resolves args to a slug (case-insensitive) and prints the cached markdown content (trimmed). If the topic has children, a `---` separator and `**{path} subtopics:**` section is appended with bullet-list child names (redundant parent prefix stripped, e.g. `cookiejar-clear` → `clear`) and a blockquote example hint using the slug path form (`k6 x docs {path}/<subtopic>`).
 - `k6 x docs best-practices` prints a curated guide (embedded in the prepare tool via `//go:embed`).
-- `k6 x docs search <query>` fuzzy searches for the query (case-insensitive, ignores punctuation and spaces).
+- `k6 x docs search <query>` fuzzy searches (case-insensitive, ignores punctuation and spaces) and prints an indented tree: `- {group}` with `  - {child}` underneath, no descriptions. Footer shows `Example:` with a sample navigation command.
 
 ## Slug resolution
 - `k6 x docs http get` → `javascript-api/k6-http/get`
@@ -27,8 +27,7 @@
 - Converted: Admonitions (`{{< admonition type="warning" >}}`) → `> **Warning:** ...` blockquotes.
 - Placeholders replaced: `<K6_VERSION>` → actual version.
 - Internal doc links to included categories are converted to plain text (URL stripped). Links to excluded categories keep the URL.
-- List topic and descriptions (also truncated to 80 chars with `...`) are aligned in columns for better readability.
-- Duplicate child names are deduplicated (e.g. `javascript-api/k6-http/get` and `using-k6/http-requests/get` both have `get` child, but only one is shown in the parent list).
+- Duplicate child names are deduplicated in search results (e.g. `javascript-api/k6-http/get` and `k6-http-get` both resolve to child name `get`, but only one is shown).
 
 ### Documentation version handling
 - Auto-detects k6 version from Go build info.

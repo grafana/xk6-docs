@@ -10,11 +10,11 @@ cmp stdout golden-http-get.txt
 
 # Child names strip parent prefix (cookiejar-clear -> clear)
 exec k6-docs --cache-dir $WORK/cache --version v0.55.x http cookiejar
-stdout 'Subtopics: clear'
+stdout '- clear'
 
-# Non-JS-API usage hint
+# Non-JS-API usage hint with slug path
 exec k6-docs --cache-dir $WORK/cache --version v0.55.x using-k6
-stdout 'Use: k6 x docs using-k6 <subtopic>'
+stdout 'k6 x docs using-k6/'
 
 # Missing markdown file: section appears blank (no error shown to user).
 rm $WORK/cache/markdown/testing-guides/_index.md
@@ -29,10 +29,14 @@ The HTTP module provides functionality for making HTTP requests.
 
 > **Note:** HTTP/2 is supported by default since k6 v0.55.x.
 
-
 ---
-Subtopics: get, post, cookiejar, get
-Use: k6 x docs http <subtopic>
+**http subtopics:**
+- get
+- post
+- cookiejar
+- get
+
+> Example: `k6 x docs http/<subtopic>`
 -- golden-http-get.txt --
 ## http.get(url, [params])
 
@@ -43,4 +47,3 @@ import http from 'k6/http';
 export default function () {
   const res = http.get('https://test-api.k6.io/');
 }
-

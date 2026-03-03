@@ -42,103 +42,54 @@ func slugToArgs(slug string) string {
 	return strings.Join(parts, " ")
 }
 
-// truncate shortens s to limit characters, appending "..." if truncated.
-func truncate(s string, limit int) string {
-	if len(s) <= limit {
-		return s
-	}
-	return s[:limit-3] + "..."
+// printExample prints a blockquote example hint preceded by a blank line.
+func printExample(w io.Writer, example string) {
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintf(w, "> Example: `%s`\n", example)
 }
 
-// listItem is a name+description pair for aligned list rendering.
-type listItem struct {
-	Name        string
-	Description string
+// printSubtopics prints a subtopics block: bold header, bullet list, and example hint.
+func printSubtopics(w io.Writer, path string, names []string) {
+	_, _ = fmt.Fprintf(w, "**%s subtopics:**\n", path)
+	for _, name := range names {
+		_, _ = fmt.Fprintf(w, "- %s\n", name)
+	}
+	printExample(w, fmt.Sprintf("k6 x docs %s/<subtopic>", path))
 }
 
-// printAlignedList prints items as a left-aligned name+description list.
-// Duplicate names (by Name) are skipped.
-func printAlignedList(w io.Writer, items []listItem) {
-	const indent = "- "
-	seen := make(map[string]bool, len(items))
-
-	maxWidth := 0
-	for _, item := range items {
-		if seen[item.Name] {
-			continue
-		}
-		seen[item.Name] = true
-		if len(item.Name) > maxWidth {
-			maxWidth = len(item.Name)
-		}
-	}
-
-	fmtStr := fmt.Sprintf("%s%%-%ds %%s\n", indent, maxWidth+1)
-
-	// Reset seen for the printing pass.
-	for k := range seen {
-		delete(seen, k)
-	}
-	for _, item := range items {
-		if seen[item.Name] {
-			continue
-		}
-		seen[item.Name] = true
-		_, _ = fmt.Fprintf(w, fmtStr, item.Name, truncate(item.Description, 80))
-	}
-}
-
-// printTOC prints the table of contents grouped by category.
+// printTOC prints the table of contents as a flat slug list.
 func printTOC(w io.Writer, idx *Index, version string) {
-	_, _ = fmt.Fprintf(w, "k6 Documentation (%s)\n", version)
-	_, _ = fmt.Fprintln(w, "Use: k6 x docs <topic>")
+	_, _ = fmt.Fprintf(w, "# k6 %s\n", version)
 
-	topLevel := idx.TopLevel()
-
-	for _, cat := range topLevel {
-		_, _ = fmt.Fprintf(w, "\n## %s\n", cat.Title)
-
-		children := idx.Children(cat.Slug)
-		if len(children) == 0 {
-			// Show the category itself if it has no children.
-			_, _ = fmt.Fprintf(w, "- %s %s\n", childName(cat.Slug, ""), truncate(cat.Description, 80))
-			continue
-		}
-
-		items := make([]listItem, 0, len(children))
-		for _, child := range children {
-			items = append(items, listItem{
-				Name:        childName(child.Slug, cat.Slug),
-				Description: child.Description,
-			})
-		}
-		printAlignedList(w, items)
-		_, _ = fmt.Fprintf(w, "\n  → Usage: k6 x docs %s <topic>\n", cat.Slug)
+	for _, cat := range idx.TopLevel() {
+		_, _ = fmt.Fprintf(w, "- %s\n", cat.Slug)
 	}
+
+	printExample(w, "k6 x docs <topic>")
 }
 
 // printSection prints a section's markdown content, read from the cache dir.
 // If the section has children, a subtopics footer is appended.
 func printSection(afs fsext.Fs, w io.Writer, idx *Index, section *Section, cacheDir, version string) {
-	content := readAndTransform(afs, cacheDir, section.RelPath, version)
+	content := strings.TrimSpace(readAndTransform(afs, cacheDir, section.RelPath, version))
 	if content != "" {
-		_, _ = fmt.Fprint(w, content)
-		if !strings.HasSuffix(content, "\n") {
-			_, _ = fmt.Fprintln(w)
-		}
+		_, _ = fmt.Fprintln(w, content)
 	}
 
 	children := idx.Children(section.Slug)
 	if len(children) > 0 {
+		path := strings.ReplaceAll(slugToArgs(section.Slug), " ", "/")
+
+		if content != "" {
+			_, _ = fmt.Fprintln(w)
+			_, _ = fmt.Fprintln(w, "---")
+		}
+
 		names := make([]string, 0, len(children))
 		for _, c := range children {
 			names = append(names, childName(c.Slug, section.Slug))
 		}
-
-		_, _ = fmt.Fprintln(w)
-		_, _ = fmt.Fprintln(w, "---")
-		_, _ = fmt.Fprintf(w, "Subtopics: %s\n", strings.Join(names, ", "))
-		_, _ = fmt.Fprintf(w, "Use: k6 x docs %s <subtopic>\n", slugToArgs(section.Slug))
+		printSubtopics(w, path, names)
 	}
 }
 
@@ -152,7 +103,7 @@ func searchGroupKey(slug string) string {
 	return parts[0]
 }
 
-// printSearch prints search results grouped hierarchically by topic.
+// printSearch prints search results as an indented tree, no descriptions.
 func printSearch(afs fsext.Fs, w io.Writer, idx *Index, term, cacheDir, version string) {
 	readContent := func(slug string) string {
 		sec, ok := idx.Lookup(slug)
@@ -164,10 +115,8 @@ func printSearch(afs fsext.Fs, w io.Writer, idx *Index, term, cacheDir, version 
 
 	results := idx.Search(term, readContent)
 
-	_, _ = fmt.Fprintf(w, "Results for %q:\n", term)
-
 	if len(results) == 0 {
-		_, _ = fmt.Fprintln(w, "\n  (no results)")
+		_, _ = fmt.Fprintln(w, "(no results)")
 		return
 	}
 
@@ -194,6 +143,8 @@ func printSearch(afs fsext.Fs, w io.Writer, idx *Index, term, cacheDir, version 
 	// Sort groups alphabetically.
 	sort.Strings(groupOrder)
 
+	var firstChildSlug string
+
 	for _, key := range groupOrder {
 		members := groups[key]
 
@@ -207,35 +158,34 @@ func printSearch(afs fsext.Fs, w io.Writer, idx *Index, term, cacheDir, version 
 		// For others, it's just "{key}".
 		groupSlug := key
 		if _, ok := idx.Lookup("javascript-api/" + key); ok {
-			// If there's a javascript-api/{key} section, this is a JS API module group.
 			if members[0].Slug == "javascript-api/"+key || strings.HasPrefix(members[0].Slug, "javascript-api/"+key+"/") {
 				groupSlug = "javascript-api/" + key
 			}
 		}
 
-		groupSec := matched[groupSlug]
-
-		// Print group header.
-		if groupSec != nil {
-			_, _ = fmt.Fprintf(w, "%s: %s\n", key, truncate(groupSec.Description, 80))
-		} else {
-			_, _ = fmt.Fprintf(w, "%s:\n", key)
-		}
+		_, _ = fmt.Fprintf(w, "- %s\n", key)
 
 		// Collect children (items that aren't the group header itself).
-		var items []listItem
+		// Deduplicate by child name.
+		seen := make(map[string]bool)
 		for _, sec := range members {
 			if sec.Slug == groupSlug {
 				continue
 			}
-			items = append(items, listItem{
-				Name:        childName(sec.Slug, groupSlug),
-				Description: sec.Description,
-			})
+			name := childName(sec.Slug, groupSlug)
+			if seen[name] {
+				continue
+			}
+			seen[name] = true
+			_, _ = fmt.Fprintf(w, "  - %s\n", name)
+			if firstChildSlug == "" {
+				firstChildSlug = sec.Slug
+			}
 		}
-		printAlignedList(w, items)
+	}
 
-		_, _ = fmt.Fprintln(w)
+	if firstChildSlug != "" {
+		printExample(w, "k6 x docs "+slugToArgs(firstChildSlug))
 	}
 }
 

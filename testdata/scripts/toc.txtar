@@ -2,25 +2,10 @@ exec k6-docs --cache-dir $WORK/cache --version v0.55.x
 cmp stdout golden.txt
 
 -- golden.txt --
-k6 Documentation (v0.55.x)
-Use: k6 x docs <topic>
+# k6 v0.55.x
+- javascript-api
+- using-k6
+- examples
+- testing-guides
 
-## JavaScript API
-- k6-http   HTTP module for k6.
-- jslib     JavaScript utility library.
-- k6-jslib  Extended JavaScript utility library.
-
-  → Usage: k6 x docs javascript-api <topic>
-
-## Using k6
-- scenarios  Configure test scenarios.
-
-  → Usage: k6 x docs using-k6 <topic>
-
-## Examples
-- websockets  WebSocket load testing examples including real-time bidirectional communicati...
-
-  → Usage: k6 x docs examples <topic>
-
-## Testing Guides
-- testing-guides テスト実行のガイドとベストプラクティスについての詳�...
+> Example: `k6 x docs <topic>`

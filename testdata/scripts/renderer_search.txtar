@@ -3,7 +3,7 @@ env XDG_CONFIG_HOME=$WORK/cat-cfg
 mkdir $WORK/cat-cfg/k6
 cp cat-n.yaml $WORK/cat-cfg/k6/docs.yaml
 exec k6-docs --cache-dir $WORK/cache --version v0.55.x search k6
-stdout 'Results for'
+stdout '- examples'
 ! stdout '\t'
 
 -- cat-n.yaml --

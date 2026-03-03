@@ -4,11 +4,11 @@ cmp stdout golden-no-results.txt
 
 # Multiple words joined by spaces
 exec k6-docs --cache-dir $WORK/cache --version v0.55.x search WebSocket example content
-stdout 'Results for "WebSocket example content":'
+stdout 'websockets'
 
 # Normalized match: spaces/dashes ignored
 exec k6-docs --cache-dir $WORK/cache --version v0.55.x search cookiejar
-stdout 'k6-http:'
+stdout 'k6-http'
 
 # bare javascript-api excluded from grouping
 exec k6-docs --cache-dir $WORK/cache --version v0.55.x search k6
@@ -16,21 +16,16 @@ cmp stdout golden-k6.txt
 ! stdout 'javascript-api:'
 
 -- golden-no-results.txt --
-Results for "zzzznotfound":
-
-  (no results)
+(no results)
 -- golden-k6.txt --
-Results for "k6":
-examples: Example k6 scripts.
+- examples
+- k6-http
+  - cookiejar
+  - cookiejar/cookiejar-clear
+  - get
+  - post
+- k6-jslib
+- using-k6
+  - scenarios
 
-k6-http: HTTP module for k6.
-- cookiejar                  HTTP cookie jar.
-- cookiejar/cookiejar-clear  Clear all cookies.
-- get                        Make an HTTP GET request.
-- post                       Make an HTTP POST request.
-
-k6-jslib: Extended JavaScript utility library.
-
-using-k6: Learn how to use k6.
-- scenarios  Configure test scenarios.
-
+> Example: `k6 x docs http cookiejar`

@@ -9,4 +9,4 @@ stderr 'topic not found'
 
 # --version and --cache-dir inherited by search subcommand
 exec k6-docs --cache-dir $WORK/cache --version v0.55.x search k6
-stdout 'Results for'
+stdout '- examples'

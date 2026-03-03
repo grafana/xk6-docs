@@ -23,29 +23,25 @@ stdout '\(no results\)'
 stderr 'requires at least 1 arg'
 
 -- golden-scenarios.txt --
-Results for "Scenarios":
-testing-guides: テスト実行のガイドとベストプラクティスについての詳�...
+- testing-guides
+- using-k6
+  - scenarios
 
-using-k6:
-- scenarios  Configure test scenarios.
-
+> Example: `k6 x docs using-k6 scenarios`
 -- golden-get-request.txt --
-Results for "GET request":
-k6-http:
-- get  Make an HTTP GET request.
+- k6-http
+  - get
 
+> Example: `k6 x docs http get`
 -- golden-k6.txt --
-Results for "k6":
-examples: Example k6 scripts.
+- examples
+- k6-http
+  - cookiejar
+  - cookiejar/cookiejar-clear
+  - get
+  - post
+- k6-jslib
+- using-k6
+  - scenarios
 
-k6-http: HTTP module for k6.
-- cookiejar                  HTTP cookie jar.
-- cookiejar/cookiejar-clear  Clear all cookies.
-- get                        Make an HTTP GET request.
-- post                       Make an HTTP POST request.
-
-k6-jslib: Extended JavaScript utility library.
-
-using-k6: Learn how to use k6.
-- scenarios  Configure test scenarios.
-
+> Example: `k6 x docs http cookiejar`

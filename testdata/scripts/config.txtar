@@ -3,7 +3,7 @@ env XDG_CONFIG_HOME=$WORK/invalid-cfg
 mkdir $WORK/invalid-cfg/k6
 cp invalid.yaml $WORK/invalid-cfg/k6/docs.yaml
 exec k6-docs --cache-dir $WORK/cache --version v0.55.x
-stdout 'k6 Documentation'
+stdout '# k6'
 stderr 'ignoring invalid config'
 
 # Config loaded via HOME fallback (no XDG_CONFIG_HOME).
@@ -21,7 +21,7 @@ env HOME=
 env USERPROFILE=
 env XDG_CONFIG_HOME=
 exec k6-docs --cache-dir $WORK/cache --version v0.55.x
-stdout 'k6 Documentation'
+stdout '# k6'
 stderr 'neither HOME nor USERPROFILE'
 
 # File-unreadable config (permission denied) — warning logged, continues
@@ -30,7 +30,7 @@ mkdir $WORK/unreadable-cfg/k6
 cp valid.yaml $WORK/unreadable-cfg/k6/docs.yaml
 chmod 000 $WORK/unreadable-cfg/k6/docs.yaml
 exec k6-docs --cache-dir $WORK/cache --version v0.55.x
-stdout 'k6 Documentation'
+stdout '# k6'
 stderr 'ignoring invalid config'
 
 -- invalid.yaml --
