@@ -3,5 +3,5 @@
 # In the test binary, dependency info is not embedded,
 # so auto-detection fails with a clear error.
 env K6_DOCS_CACHE_DIR=$WORK/cache
-! exec k6-docs
+! k6-docs
 stderr 'dependency not found in build info'

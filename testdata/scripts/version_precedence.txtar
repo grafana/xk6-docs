@@ -1,36 +1,36 @@
 # --version flag overrides K6_DOCS_VERSION env
 env K6_DOCS_VERSION=v9.9.x
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x
+k6-docs --cache-dir $WORK/cache --version v0.55.x
 stdout '# k6 v0\.55\.x'
 
 # K6_DOCS_VERSION env used when no --version flag
 env K6_DOCS_VERSION=v0.55.x
 env K6_DOCS_CACHE_DIR=
-exec k6-docs --cache-dir $WORK/cache
+k6-docs --cache-dir $WORK/cache
 stdout '# k6 v0\.55\.x'
 
 # K6_DOCS_CACHE_DIR env used when no --cache-dir flag
 env K6_DOCS_VERSION=
 env K6_DOCS_CACHE_DIR=$WORK/cache
-exec k6-docs --version v0.55.x
+k6-docs --version v0.55.x
 stdout '# k6 v0\.55\.x'
 
 # --cache-dir flag overrides K6_DOCS_CACHE_DIR env
 env K6_DOCS_VERSION=
 env K6_DOCS_CACHE_DIR=/nonexistent/path
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x
+k6-docs --cache-dir $WORK/cache --version v0.55.x
 stdout '# k6 v0\.55\.x'
 
 # --version is used VERBATIM — no wildcard mapping applied
 env K6_DOCS_VERSION=
 env K6_DOCS_CACHE_DIR=
-exec k6-docs --cache-dir $WORK/cache-exact --version v0.55.2
+k6-docs --cache-dir $WORK/cache-exact --version v0.55.2
 stdout '# k6 v0\.55\.2'
 
 # K6_DOCS_VERSION env also used verbatim
 env K6_DOCS_VERSION=v0.55.2
 env K6_DOCS_CACHE_DIR=
-exec k6-docs --cache-dir $WORK/cache-exact
+k6-docs --cache-dir $WORK/cache-exact
 stdout '# k6 v0\.55\.2'
 
 -- cache-exact/sections.json --

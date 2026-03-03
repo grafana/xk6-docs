@@ -1,29 +1,29 @@
 # Full slug with /
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x javascript-api/k6-http/get
+k6-docs --cache-dir $WORK/cache --version v0.55.x javascript-api/k6-http/get
 cmp stdout golden-get.txt
 
 # JS API shortcut (same output proves correct resolution)
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x http get
+k6-docs --cache-dir $WORK/cache --version v0.55.x http get
 cmp stdout golden-get.txt
 
 # Case insensitive
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x HTTP GET
+k6-docs --cache-dir $WORK/cache --version v0.55.x HTTP GET
 cmp stdout golden-get.txt
 
 # k6- prefix dedup
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x k6-http get
+k6-docs --cache-dir $WORK/cache --version v0.55.x k6-http get
 cmp stdout golden-get.txt
 
 # Category prefix
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x using-k6 scenarios
+k6-docs --cache-dir $WORK/cache --version v0.55.x using-k6 scenarios
 cmp stdout golden-scenarios.txt
 
 # Parent prefix fallback (cookiejar/clear → cookiejar/cookiejar-clear)
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x http cookiejar clear
+k6-docs --cache-dir $WORK/cache --version v0.55.x http cookiejar clear
 cmp stdout golden-clear.txt
 
 # Bare name prefers unprefixed (both jslib and k6-jslib exist)
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x jslib
+k6-docs --cache-dir $WORK/cache --version v0.55.x jslib
 cmp stdout golden-jslib.txt
 
 -- golden-get.txt --

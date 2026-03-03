@@ -15,21 +15,6 @@ import (
 	"go.k6.io/k6/lib/fsext"
 )
 
-func TestMain(m *testing.M) {
-	testscript.Main(m, map[string]func(){
-		"k6-docs": func() {
-			gs := state.NewGlobalState(context.Background())
-			gs.Logger.SetLevel(logrus.DebugLevel)
-			cmd := newCmd(gs)
-			cmd.SetArgs(os.Args[1:])
-			if err := cmd.Execute(); err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				os.Exit(1)
-			}
-		},
-	})
-}
-
 func TestScripts(t *testing.T) {
 	t.Parallel()
 
@@ -38,8 +23,44 @@ func TestScripts(t *testing.T) {
 		Setup: func(env *testscript.Env) error {
 			return copyDir("testdata/cache", filepath.Join(env.WorkDir, "cache"))
 		},
+		Cmds: map[string]func(ts *testscript.TestScript, neg bool, args []string){
+			"k6-docs": runK6DocsCmd,
+		},
 		UpdateScripts: os.Getenv("UPDATE_GOLDEN") != "",
 	})
+}
+
+// runK6DocsCmd runs the docs command in-process for testscript, avoiding
+// subprocess overhead. It injects the testscript's sandboxed environment
+// into the GlobalState so env directives in txtar scripts work correctly.
+func runK6DocsCmd(ts *testscript.TestScript, neg bool, args []string) {
+	gs := state.NewGlobalState(context.Background())
+	gs.Logger.SetLevel(logrus.DebugLevel)
+	gs.Logger.SetOutput(ts.Stderr())
+	gs.Env = map[string]string{
+		"K6_DOCS_VERSION":   ts.Getenv("K6_DOCS_VERSION"),
+		"K6_DOCS_CACHE_DIR": ts.Getenv("K6_DOCS_CACHE_DIR"),
+		"HOME":              ts.Getenv("HOME"),
+		"USERPROFILE":       ts.Getenv("USERPROFILE"),
+		"XDG_CONFIG_HOME":   ts.Getenv("XDG_CONFIG_HOME"),
+	}
+
+	cmd := newCmd(gs)
+	cmd.SetOut(ts.Stdout())
+	cmd.SetErr(ts.Stderr())
+	cmd.SetArgs(args)
+
+	err := cmd.Execute()
+	if err != nil {
+		_, _ = fmt.Fprintf(ts.Stderr(), "Error: %v\n", err)
+	}
+	if neg {
+		if err == nil {
+			ts.Fatalf("expected command to fail")
+		}
+	} else if err != nil {
+		ts.Fatalf("unexpected command failure")
+	}
 }
 
 func copyDir(src, dst string) error {

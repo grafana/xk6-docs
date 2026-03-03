@@ -1,24 +1,24 @@
 # Section with children shows subtopics footer
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x http
+k6-docs --cache-dir $WORK/cache --version v0.55.x http
 cmp stdout golden-http.txt
 
 # Leaf section: no subtopics footer, frontmatter stripped
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x http get
+k6-docs --cache-dir $WORK/cache --version v0.55.x http get
 cmp stdout golden-http-get.txt
 ! stdout '---'
 ! stdout 'title:'
 
 # Child names strip parent prefix (cookiejar-clear -> clear)
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x http cookiejar
+k6-docs --cache-dir $WORK/cache --version v0.55.x http cookiejar
 stdout '- clear'
 
 # Non-JS-API usage hint with slug path
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x using-k6
+k6-docs --cache-dir $WORK/cache --version v0.55.x using-k6
 stdout 'k6 x docs using-k6/'
 
 # Missing markdown file: section appears blank (no error shown to user).
 rm $WORK/cache/markdown/testing-guides/_index.md
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x testing-guides
+k6-docs --cache-dir $WORK/cache --version v0.55.x testing-guides
 ! stderr 'error'
 ! stderr 'not found'
 

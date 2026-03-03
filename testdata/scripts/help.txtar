@@ -1,5 +1,5 @@
 # Main command help text
-exec k6-docs --help
+k6-docs --help
 stdout 'Offline k6 documentation'
 stdout 'Auto-downloads docs matching your k6 version'
 stdout 'Use search to find topics'
@@ -8,5 +8,5 @@ stdout 'search'
 stdout 'k6 x docs http get'
 
 # Search subcommand help text
-exec k6-docs search --help
+k6-docs search --help
 stdout 'Fuzzy search across all topics'

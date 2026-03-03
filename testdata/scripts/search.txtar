@@ -1,25 +1,25 @@
 # Title/description match
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x search Scenarios
+k6-docs --cache-dir $WORK/cache --version v0.55.x search Scenarios
 cmp stdout golden-scenarios.txt
 
 # Description match grouped by JS API module
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x search 'GET request'
+k6-docs --cache-dir $WORK/cache --version v0.55.x search 'GET request'
 cmp stdout golden-get-request.txt
 
 # Multi-group sorted alphabetically
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x search k6
+k6-docs --cache-dir $WORK/cache --version v0.55.x search k6
 cmp stdout golden-k6.txt
 
 # Body content match
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x search 'WebSocket example content'
+k6-docs --cache-dir $WORK/cache --version v0.55.x search 'WebSocket example content'
 stdout 'websockets'
 
 # No results
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x search zzzznotfound
+k6-docs --cache-dir $WORK/cache --version v0.55.x search zzzznotfound
 stdout '\(no results\)'
 
 # Missing arg errors
-! exec k6-docs --cache-dir $WORK/cache --version v0.55.x search
+! k6-docs --cache-dir $WORK/cache --version v0.55.x search
 stderr 'requires at least 1 arg'
 
 -- golden-scenarios.txt --

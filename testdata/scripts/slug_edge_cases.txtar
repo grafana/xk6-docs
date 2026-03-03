@@ -1,17 +1,17 @@
 # Rule 1: slash in args[0] with multiple args → join all with /
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x javascript-api/k6-http get
+k6-docs --cache-dir $WORK/cache --version v0.55.x javascript-api/k6-http get
 cmp stdout golden-get.txt
 
 # Rule 1: slash in later arg → error (joins to nonexistent path)
-! exec k6-docs --cache-dir $WORK/cache --version v0.55.x http k6-http/get
+! k6-docs --cache-dir $WORK/cache --version v0.55.x http k6-http/get
 stderr 'topic not found'
 
 # Category matching is case-sensitive
-! exec k6-docs --cache-dir $WORK/cache --version v0.55.x Using-k6 scenarios
+! k6-docs --cache-dir $WORK/cache --version v0.55.x Using-k6 scenarios
 stderr 'topic not found'
 
 # Nonexistent slug after fallback
-! exec k6-docs --cache-dir $WORK/cache --version v0.55.x totally-fake-module nonexistent
+! k6-docs --cache-dir $WORK/cache --version v0.55.x totally-fake-module nonexistent
 stderr 'topic not found'
 
 -- golden-get.txt --

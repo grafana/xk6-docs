@@ -1,17 +1,17 @@
 # No results exact format
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x search zzzznotfound
+k6-docs --cache-dir $WORK/cache --version v0.55.x search zzzznotfound
 cmp stdout golden-no-results.txt
 
 # Multiple words joined by spaces
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x search WebSocket example content
+k6-docs --cache-dir $WORK/cache --version v0.55.x search WebSocket example content
 stdout 'websockets'
 
 # Normalized match: spaces/dashes ignored
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x search cookiejar
+k6-docs --cache-dir $WORK/cache --version v0.55.x search cookiejar
 stdout 'k6-http'
 
 # bare javascript-api excluded from grouping
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x search k6
+k6-docs --cache-dir $WORK/cache --version v0.55.x search k6
 cmp stdout golden-k6.txt
 ! stdout 'javascript-api:'
 

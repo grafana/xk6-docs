@@ -1,23 +1,23 @@
 # best-practices ignores extra args
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x best-practices extra-arg
+k6-docs --cache-dir $WORK/cache --version v0.55.x best-practices extra-arg
 ! stdout 'extra-arg'
 stdout 'best practices'
 
 # best-practices is case-sensitive
-! exec k6-docs --cache-dir $WORK/cache --version v0.55.x Best-Practices
+! k6-docs --cache-dir $WORK/cache --version v0.55.x Best-Practices
 stderr 'topic not found'
 
 # --version and --cache-dir inherited by search subcommand
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x search k6
+k6-docs --cache-dir $WORK/cache --version v0.55.x search k6
 stdout '- examples'
 
 # --depth 1 shows flat list
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x --depth 1
+k6-docs --cache-dir $WORK/cache --version v0.55.x --depth 1
 stdout '- javascript-api'
 ! stdout '  - k6-http'
 
 # --depth 3 shows grandchildren
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x --depth 3
+k6-docs --cache-dir $WORK/cache --version v0.55.x --depth 3
 stdout '  - k6-http'
 stdout '    - get'
 
@@ -25,7 +25,7 @@ stdout '    - get'
 env XDG_CONFIG_HOME=$WORK/depth-cfg
 mkdir $WORK/depth-cfg/k6
 cp depth3.yaml $WORK/depth-cfg/k6/docs.yaml
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x --depth 1
+k6-docs --cache-dir $WORK/cache --version v0.55.x --depth 1
 stdout '- javascript-api'
 ! stdout '  - k6-http'
 

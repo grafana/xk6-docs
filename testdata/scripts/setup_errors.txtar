@@ -1,5 +1,5 @@
 # Bad sections.json → load index error
-! exec k6-docs --cache-dir $WORK/bad-cache --version v0.55.x
+! k6-docs --cache-dir $WORK/bad-cache --version v0.55.x
 stderr 'load index'
 
 -- bad-cache/sections.json --

@@ -1,4 +1,4 @@
-exec k6-docs --cache-dir $WORK/cache --version v0.55.x
+k6-docs --cache-dir $WORK/cache --version v0.55.x
 cmp stdout golden.txt
 
 -- golden.txt --
