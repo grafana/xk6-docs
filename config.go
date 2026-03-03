@@ -12,6 +12,7 @@ import (
 // docsConfig holds user configuration for the docs subcommand.
 type docsConfig struct {
 	Renderer string `yaml:"renderer"`
+	Depth    int    `yaml:"depth"`
 }
 
 // homeDirFromEnv returns the user's home directory from environment variables.
@@ -46,14 +47,13 @@ func configDir(env map[string]string) (string, error) {
 func loadConfig(afs fsext.Fs, env map[string]string) (docsConfig, error) {
 	dir, err := configDir(env)
 	if err != nil {
-		return docsConfig{}, err
+		return docsConfig{Depth: 2}, err
 	}
 
 	data, err := fsext.ReadFile(afs, filepath.Join(dir, "docs.yaml"))
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			// File not found is perfectly normal — return empty config.
-			return docsConfig{}, nil
+			return docsConfig{Depth: 2}, nil
 		}
 		return docsConfig{}, err
 	}
@@ -61,6 +61,10 @@ func loadConfig(afs fsext.Fs, env map[string]string) (docsConfig, error) {
 	var cfg docsConfig
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return docsConfig{}, err
+	}
+
+	if cfg.Depth == 0 {
+		cfg.Depth = 2
 	}
 
 	return cfg, nil

@@ -34,6 +34,7 @@ The HTTP module provides functionality for making HTTP requests.
 - get
 - post
 - cookiejar
+  - clear
 - get
 
 > Example: `k6 x docs http/<subtopic>`

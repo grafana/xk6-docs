@@ -42,6 +42,7 @@ Use search to find topics quickly.`,
 
 	cmd.PersistentFlags().StringVar(&opts.version, "version", "", "Override k6 version for docs lookup")
 	cmd.PersistentFlags().StringVar(&opts.cacheDir, "cache-dir", "", "Override cache directory")
+	cmd.PersistentFlags().IntVar(&opts.depth, "depth", 0, "Override subtopic depth (default from config or 2)")
 
 	searchCmd := &cobra.Command{
 		Use:   "search <term>",
@@ -60,6 +61,7 @@ Use search to find topics quickly.`,
 type docsOpts struct {
 	version  string
 	cacheDir string
+	depth    int
 }
 
 func runSearch(gs *state.GlobalState, cmd *cobra.Command, args []string, opts *docsOpts) error {
@@ -111,7 +113,11 @@ func runDocs(gs *state.GlobalState, cmd *cobra.Command, args []string, opts *doc
 		w = buf
 	}
 
-	env := &docsEnv{FS: gs.FS, CacheDir: cacheDir, Version: version}
+	depth := cfg.Depth
+	if opts.depth > 0 {
+		depth = opts.depth
+	}
+	env := &docsEnv{FS: gs.FS, CacheDir: cacheDir, Version: version, Depth: depth}
 	if err := showDocs(env, w, idx, args); err != nil {
 		return err
 	}

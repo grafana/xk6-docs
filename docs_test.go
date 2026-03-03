@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/rogpeppe/go-internal/testscript"
@@ -59,6 +60,64 @@ func copyDir(src, dst string) error {
 			return err
 		}
 		return os.WriteFile(target, content, 0o644)
+	})
+}
+
+func TestPrintTree(t *testing.T) {
+	t.Parallel()
+
+	sections := []Section{
+		{Slug: "alpha", Weight: 1, Category: "alpha", Children: []string{"alpha/child-1", "alpha/child-2"}},
+		{Slug: "alpha/child-1", Weight: 1, Category: "alpha", Children: []string{"alpha/child-1/grandchild"}},
+		{Slug: "alpha/child-1/grandchild", Weight: 1, Category: "alpha"},
+		{Slug: "alpha/child-2", Weight: 2, Category: "alpha"},
+		{Slug: "beta", Weight: 2, Category: "beta"},
+	}
+	idx := &Index{Sections: sections}
+	idx.bySlug = make(map[string]*Section, len(sections))
+	for i := range sections {
+		idx.bySlug[sections[i].Slug] = &sections[i]
+	}
+
+	items := idx.TopLevel()
+
+	t.Run("depth 1 prints flat list", func(t *testing.T) {
+		t.Parallel()
+		var buf strings.Builder
+		printTree(&buf, idx, items, "", "", 1)
+		want := "- alpha\n- beta\n"
+		if buf.String() != want {
+			t.Errorf("depth=1:\ngot:\n%s\nwant:\n%s", buf.String(), want)
+		}
+	})
+
+	t.Run("depth 2 prints one level of children", func(t *testing.T) {
+		t.Parallel()
+		var buf strings.Builder
+		printTree(&buf, idx, items, "", "", 2)
+		want := "- alpha\n  - child-1\n  - child-2\n- beta\n"
+		if buf.String() != want {
+			t.Errorf("depth=2:\ngot:\n%s\nwant:\n%s", buf.String(), want)
+		}
+	})
+
+	t.Run("depth 3 prints grandchildren", func(t *testing.T) {
+		t.Parallel()
+		var buf strings.Builder
+		printTree(&buf, idx, items, "", "", 3)
+		want := "- alpha\n  - child-1\n    - grandchild\n  - child-2\n- beta\n"
+		if buf.String() != want {
+			t.Errorf("depth=3:\ngot:\n%s\nwant:\n%s", buf.String(), want)
+		}
+	})
+
+	t.Run("depth 0 prints nothing", func(t *testing.T) {
+		t.Parallel()
+		var buf strings.Builder
+		printTree(&buf, idx, items, "", "", 0)
+		if buf.String() != "" {
+			t.Errorf("depth=0: got %q, want empty", buf.String())
+		}
 	})
 }
 

@@ -33,6 +33,30 @@ exec k6-docs --cache-dir $WORK/cache --version v0.55.x
 stdout '# k6'
 stderr 'ignoring invalid config'
 
+# depth: 1 shows flat list (no children)
+env XDG_CONFIG_HOME=$WORK/depth1-cfg
+mkdir $WORK/depth1-cfg/k6
+cp depth1.yaml $WORK/depth1-cfg/k6/docs.yaml
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x
+stdout '- javascript-api'
+! stdout '  - k6-http'
+
+# depth: 3 shows grandchildren in TOC
+env XDG_CONFIG_HOME=$WORK/depth3-cfg
+mkdir $WORK/depth3-cfg/k6
+cp depth3.yaml $WORK/depth3-cfg/k6/docs.yaml
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x
+stdout '  - k6-http'
+stdout '    - get'
+
+# depth: 1 in section subtopics shows flat children
+env XDG_CONFIG_HOME=$WORK/depth1-section-cfg
+mkdir $WORK/depth1-section-cfg/k6
+cp depth1.yaml $WORK/depth1-section-cfg/k6/docs.yaml
+exec k6-docs --cache-dir $WORK/cache --version v0.55.x http
+stdout '- cookiejar'
+! stdout '  - clear'
+
 -- invalid.yaml --
 :
   :
@@ -41,3 +65,7 @@ stderr 'ignoring invalid config'
 renderer: cat -n
 -- valid.yaml --
 renderer: cat
+-- depth1.yaml --
+depth: 1
+-- depth3.yaml --
+depth: 3

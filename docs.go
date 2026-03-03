@@ -15,6 +15,7 @@ type docsEnv struct {
 	FS       fsext.Fs
 	CacheDir string
 	Version  string
+	Depth    int
 }
 
 func (env *docsEnv) readAndTransform(relPath string) string {
@@ -63,19 +64,32 @@ func printExample(w io.Writer, example string) {
 	_, _ = fmt.Fprintf(w, "> Example: `%s`\n", example)
 }
 
-// printSubtopics prints a subtopics block: bold header, bullet list, and example hint.
-func printSubtopics(w io.Writer, path string, names []string) {
-	_, _ = fmt.Fprintf(w, "**%s subtopics:**\n", path)
-	for _, name := range names {
-		_, _ = fmt.Fprintf(w, "- %s\n", name)
+// printTree prints sections as indented bullets, recursing into children up to depth levels.
+func printTree(w io.Writer, idx *Index, items []*Section, parentSlug, indent string, depth int) {
+	if depth < 1 {
+		return
 	}
+	for _, item := range items {
+		name := childName(item.Slug, parentSlug)
+		_, _ = fmt.Fprintf(w, "%s- %s\n", indent, name)
+		if depth > 1 {
+			children := idx.Children(item.Slug)
+			printTree(w, idx, children, item.Slug, indent+"  ", depth-1)
+		}
+	}
+}
+
+// printSubtopics prints a subtopics block: bold header, bullet list, and example hint.
+func printSubtopics(w io.Writer, idx *Index, path string, children []*Section, parentSlug string, depth int) {
+	_, _ = fmt.Fprintf(w, "**%s subtopics:**\n", path)
+	printTree(w, idx, children, parentSlug, "", depth)
 	printExample(w, fmt.Sprintf("k6 x docs %s/<subtopic>", path))
 }
 
 // showDocs resolves args to a topic and prints it.
 func showDocs(env *docsEnv, w io.Writer, idx *Index, args []string) error {
 	if len(args) == 0 {
-		printTOC(w, idx, env.Version)
+		printTOC(w, idx, env.Version, env.Depth)
 		return nil
 	}
 
@@ -97,14 +111,10 @@ func showDocs(env *docsEnv, w io.Writer, idx *Index, args []string) error {
 	return nil
 }
 
-// printTOC prints the table of contents as a flat slug list.
-func printTOC(w io.Writer, idx *Index, version string) {
+// printTOC prints the table of contents with subtopics up to depth levels.
+func printTOC(w io.Writer, idx *Index, version string, depth int) {
 	_, _ = fmt.Fprintf(w, "# k6 %s\n", version)
-
-	for _, cat := range idx.TopLevel() {
-		_, _ = fmt.Fprintf(w, "- %s\n", cat.Slug)
-	}
-
+	printTree(w, idx, idx.TopLevel(), "", "", depth)
 	printExample(w, "k6 x docs <topic>")
 }
 
@@ -125,11 +135,7 @@ func printSection(env *docsEnv, w io.Writer, idx *Index, section *Section) {
 			_, _ = fmt.Fprintln(w, "---")
 		}
 
-		names := make([]string, 0, len(children))
-		for _, c := range children {
-			names = append(names, childName(c.Slug, section.Slug))
-		}
-		printSubtopics(w, path, names)
+		printSubtopics(w, idx, path, children, section.Slug, env.Depth)
 	}
 }
 

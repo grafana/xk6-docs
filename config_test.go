@@ -174,6 +174,67 @@ func TestLoadConfig(t *testing.T) {
 		}
 	})
 
+	t.Run("depth from config", func(t *testing.T) {
+		t.Parallel()
+		afs := fsext.NewMemMapFs()
+		dir := "/tmp/config-depth"
+		env := map[string]string{"XDG_CONFIG_HOME": dir}
+
+		k6Dir := filepath.Join(dir, "k6")
+		if err := afs.MkdirAll(k6Dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := fsext.WriteFile(afs, filepath.Join(k6Dir, "docs.yaml"), []byte("depth: 3\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		cfg, err := loadConfig(afs, env)
+		if err != nil {
+			t.Fatalf("loadConfig: unexpected error: %v", err)
+		}
+		if cfg.Depth != 3 {
+			t.Errorf("loadConfig: Depth = %d, want 3", cfg.Depth)
+		}
+	})
+
+	t.Run("depth defaults to 2 when not set", func(t *testing.T) {
+		t.Parallel()
+		afs := fsext.NewMemMapFs()
+		dir := "/tmp/config-depth-default"
+		env := map[string]string{"XDG_CONFIG_HOME": dir}
+
+		k6Dir := filepath.Join(dir, "k6")
+		if err := afs.MkdirAll(k6Dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := fsext.WriteFile(afs, filepath.Join(k6Dir, "docs.yaml"), []byte("renderer: glow\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		cfg, err := loadConfig(afs, env)
+		if err != nil {
+			t.Fatalf("loadConfig: unexpected error: %v", err)
+		}
+		if cfg.Depth != 2 {
+			t.Errorf("loadConfig: Depth = %d, want 2", cfg.Depth)
+		}
+	})
+
+	t.Run("depth defaults to 2 when no config file", func(t *testing.T) {
+		t.Parallel()
+		afs := fsext.NewMemMapFs()
+		dir := "/tmp/config-depth-nofile"
+		env := map[string]string{"XDG_CONFIG_HOME": dir}
+
+		cfg, err := loadConfig(afs, env)
+		if err != nil {
+			t.Fatalf("loadConfig: unexpected error: %v", err)
+		}
+		if cfg.Depth != 2 {
+			t.Errorf("loadConfig: Depth = %d, want 2", cfg.Depth)
+		}
+	})
+
 	t.Run("empty renderer field", func(t *testing.T) {
 		t.Parallel()
 		afs := fsext.NewMemMapFs()
