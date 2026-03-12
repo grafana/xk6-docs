@@ -42,7 +42,6 @@ func runK6DocsCmd(ts *testscript.TestScript, neg bool, args []string) {
 		"K6_DOCS_CACHE_DIR": ts.Getenv("K6_DOCS_CACHE_DIR"),
 		"HOME":              ts.Getenv("HOME"),
 		"USERPROFILE":       ts.Getenv("USERPROFILE"),
-		"XDG_CONFIG_HOME":   ts.Getenv("XDG_CONFIG_HOME"),
 	}
 
 	cmd := newCmd(gs)
@@ -150,7 +149,7 @@ func TestPrintSearchArgs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadIndex: %v", err)
 	}
-	env := &docsEnv{FS: afs, CacheDir: dir, Version: "v0.55.x", Depth: 2}
+	env := &docsEnv{FS: afs, CacheDir: dir, Version: "v0.55.x", Depth: 1}
 
 	tests := []struct {
 		name string
@@ -184,7 +183,7 @@ func TestPrintSearchNoResults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadIndex: %v", err)
 	}
-	env := &docsEnv{FS: afs, CacheDir: dir, Version: "v0.55.x", Depth: 2}
+	env := &docsEnv{FS: afs, CacheDir: dir, Version: "v0.55.x", Depth: 1}
 
 	var buf strings.Builder
 	printSearch(env, &buf, idx, []string{"zzzznotfound"})
@@ -230,7 +229,6 @@ func TestPrintSearchDepth(t *testing.T) {
 }
 
 // newTestGlobalState creates a GlobalState with an in-memory filesystem for unit tests.
-// Used by TTY-dependent tests in config_test.go that can't be tested via testscript.
 func newTestGlobalState(t *testing.T, afs fsext.Fs) *state.GlobalState {
 	t.Helper()
 

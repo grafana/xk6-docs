@@ -2,13 +2,9 @@ package docs
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"net/http"
-	"os/exec"
-	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"go.k6.io/k6/cmd/state"
@@ -42,7 +38,7 @@ Use search to find topics quickly.`,
 
 	cmd.PersistentFlags().StringVar(&opts.version, "version", "", "Override k6 version for docs lookup")
 	cmd.PersistentFlags().StringVar(&opts.cacheDir, "cache-dir", "", "Override cache directory")
-	cmd.PersistentFlags().IntVar(&opts.depth, "depth", 0, "Override subtopic depth (default from config or 2)")
+	cmd.PersistentFlags().IntVar(&opts.depth, "depth", 0, "Override subtopic depth (default 1)")
 
 	searchCmd := &cobra.Command{
 		Use:   "search <term>",
@@ -73,35 +69,34 @@ type runCtx struct {
 }
 
 // prepareRun handles setup shared by runDocs and runSearch:
-// version/cache resolution, config loading, depth, and renderer buffering.
+// version/cache resolution, depth, and renderer buffering.
 func prepareRun(gs *state.GlobalState, cmd *cobra.Command, opts *docsOpts) (*runCtx, error) {
 	version, cacheDir, idx, err := setup(gs, opts.version, opts.cacheDir)
 	if err != nil {
 		return nil, err
 	}
 
-	cfg, cfgErr := loadConfig(gs.FS, gs.Env)
-	if cfgErr != nil {
-		gs.Logger.Warnf("docs: ignoring invalid config: %v", cfgErr)
-	}
-
-	baseW := cmd.OutOrStdout()
-	var buf *bytes.Buffer
-	w := baseW
-
-	if cfg.Renderer != "" && gs.Stdout.IsTTY && !gs.Flags.NoColor {
-		buf = &bytes.Buffer{}
-		w = buf
-	}
-
-	depth := cfg.Depth
+	depth := defaultDepth
 	if opts.depth > 0 {
 		depth = opts.depth
 	}
 
 	env := &docsEnv{FS: gs.FS, CacheDir: cacheDir, Version: version, Depth: depth}
+
+	baseW := cmd.OutOrStdout()
+	w := baseW
+	var buf *bytes.Buffer
+
+	if gs.Stdout.IsTTY && !gs.Flags.NoColor {
+		buf = &bytes.Buffer{}
+		w = buf
+	}
+
 	flush := func() error {
-		return pipeRenderer(cmd.Context(), buf, gs.Stdout.Writer, baseW, gs.Stderr, cfg.Renderer)
+		if buf == nil || buf.Len() == 0 {
+			return nil
+		}
+		return renderMarkdown(gs.Stdout.Writer, buf.String())
 	}
 
 	return &runCtx{env: env, idx: idx, w: w, flush: flush}, nil
@@ -137,47 +132,6 @@ func logMode(gs *state.GlobalState, isTTY bool) {
 	} else {
 		gs.Logger.Debug("docs: agent mode (stdout is not a TTY)")
 	}
-}
-
-func pipeRenderer(
-	ctx context.Context, buf *bytes.Buffer, stdout, fallback, stderr io.Writer, renderer string,
-) error {
-	if buf == nil || buf.Len() == 0 {
-		return nil
-	}
-
-	raw := buf.Bytes()
-
-	parts := strings.Fields(renderer)
-	if len(parts) == 0 {
-		_, err := fallback.Write(raw)
-		return err
-	}
-
-	bin, err := exec.LookPath(parts[0])
-	if err != nil {
-		_, writeErr := fallback.Write(raw)
-		return writeErr
-	}
-
-	if err := runRenderer(ctx, bin, parts[1:], bytes.NewReader(raw), stdout, stderr); err != nil {
-		_, writeErr := fallback.Write(raw)
-		return writeErr
-	}
-
-	return nil
-}
-
-func runRenderer(
-	ctx context.Context, bin string, args []string, stdin io.Reader, stdout, stderr io.Writer,
-) error {
-	//nolint:gosec // G204 has no sanitizer support (unlike G304). bin is validated via exec.LookPath.
-	rc := exec.CommandContext(ctx, filepath.Clean(bin), args...)
-	rc.Stdin = stdin
-	rc.Stdout = stdout
-	rc.Stderr = stderr
-
-	return rc.Run()
 }
 
 // setup resolves the version, ensures docs are cached, and loads the index.
