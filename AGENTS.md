@@ -48,12 +48,12 @@
 - Populates parent→child relationships.
 - Outputs: `dist/sections.json`, `dist/markdown/**/*.md`, `dist/best_practices.md`.
 
-### Agent skill (`skills/k6-lookup-docs/`)
+### Agent skill (`skills/xk6-docs/`)
 - Installable via `npx skills add grafana/xk6-docs`. Agent-independent (works with Claude Code, Cursor, Codex, etc.).
 - Never duplicate docs content (code examples, API descriptions). Only provide navigation paths and gotchas that save agents from trial-and-error.
 - Each reference is a single module/area workflow.
 - Before updating the skill, use `./k6 x docs` yourself to verify paths and discover gotchas.
-- Run `skills/k6-lookup-docs/scripts/validate-paths.sh ./k6` to find broken paths and uncovered modules.
+- Run `skills/xk6-docs/scripts/validate-paths.sh ./k6` to find broken paths and uncovered modules.
 
 ### CI/CD
 - CI: lint + test + build on push/PR to main.

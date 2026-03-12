@@ -2,7 +2,7 @@
 # Validates all lookup paths in skill references against the actual docs.
 # Run after a k6 version bump to find broken/missing paths.
 #
-# Usage: ./skills/k6-lookup-docs/scripts/validate-paths.sh [path-to-k6-binary]
+# Usage: ./skills/xk6-docs/scripts/validate-paths.sh [path-to-k6-binary]
 
 set -euo pipefail
 
