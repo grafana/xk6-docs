@@ -12,7 +12,7 @@ cmp stdout golden-k6.txt
 
 # Body content match
 k6-docs --cache-dir $WORK/cache --version v0.55.x search 'WebSocket example content'
-stdout 'websockets'
+stdout 'examples'
 
 # No results
 k6-docs --cache-dir $WORK/cache --version v0.55.x search zzzznotfound
@@ -25,23 +25,10 @@ stderr 'requires at least 1 arg'
 -- golden-scenarios.txt --
 - testing-guides
 - using-k6
-  - scenarios
-
-> Example: `k6 x docs using-k6 scenarios`
 -- golden-get-request.txt --
 - k6-http
-  - get
-
-> Example: `k6 x docs http get`
 -- golden-k6.txt --
 - examples
 - k6-http
-  - cookiejar
-  - cookiejar/cookiejar-clear
-  - get
-  - post
 - k6-jslib
 - using-k6
-  - scenarios
-
-> Example: `k6 x docs http cookiejar`

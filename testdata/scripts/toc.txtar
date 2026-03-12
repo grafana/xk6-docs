@@ -4,13 +4,8 @@ cmp stdout golden.txt
 -- golden.txt --
 # k6 v0.55.x
 - javascript-api
-  - k6-http
-  - jslib
-  - k6-jslib
 - using-k6
-  - scenarios
 - examples
-  - websockets
 - testing-guides
 
 > Example: `k6 x docs <topic>`

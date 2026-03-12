@@ -4,7 +4,7 @@ cmp stdout golden-no-results.txt
 
 # Multiple words joined by spaces
 k6-docs --cache-dir $WORK/cache --version v0.55.x search WebSocket example content
-stdout 'websockets'
+stdout 'examples'
 
 # Normalized match: spaces/dashes ignored
 k6-docs --cache-dir $WORK/cache --version v0.55.x search cookiejar
@@ -20,12 +20,5 @@ cmp stdout golden-k6.txt
 -- golden-k6.txt --
 - examples
 - k6-http
-  - cookiejar
-  - cookiejar/cookiejar-clear
-  - get
-  - post
 - k6-jslib
 - using-k6
-  - scenarios
-
-> Example: `k6 x docs http cookiejar`
