@@ -7,7 +7,6 @@
 package main
 
 import (
-	"context"
 	"crypto/rand"
 	_ "embed"
 	"encoding/json"
@@ -17,12 +16,11 @@ import (
 	"io"
 	"io/fs"
 	"log"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
+	git "github.com/go-git/go-git/v5"
 	docs "github.com/grafana/xk6-docs"
 	"go.k6.io/k6/lib/fsext"
 	"gopkg.in/yaml.v3"
@@ -130,16 +128,13 @@ func ensureDocsRepo(
 		return "", nil, fmt.Errorf("create temp dir: %w", err)
 	}
 
-	log.Println("Cloning k6-docs repository...")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-	//nolint:gosec // G204: repoURL is either the hardcoded defaultRepoURL constant or a test-controlled local path.
-	cmd := exec.CommandContext(ctx,
-		"git", "clone", "--depth", "1", repoURL, ".")
-	cmd.Dir = tmpDir
-	cmd.Stdout = stderr
-	cmd.Stderr = stderr
-	if err := cmd.Run(); err != nil {
+	_, _ = fmt.Fprintln(stderr, "Cloning k6-docs repository...")
+	_, err = git.PlainClone(tmpDir, false, &git.CloneOptions{
+		URL:      repoURL,
+		Depth:    1,
+		Progress: stderr,
+	})
+	if err != nil {
 		_ = afs.RemoveAll(tmpDir)
 		return "", nil, fmt.Errorf("clone k6-docs: %w", err)
 	}
