@@ -16,7 +16,7 @@ A [k6 extension](https://grafana.com/docs/k6/latest/extensions/) for developers 
 - Works offline: no network needed after first use
 - Always the right version:  docs match your k6 build, not just "latest"
 - Find what you need: search by any word
-- Compose with the tools you love ([glow](https://github.com/charmbracelet/glow)) and render beautiful docs
+- Pretty output: built-in markdown rendering for terminals
 
 ## Usage
 
@@ -41,14 +41,6 @@ xk6 build --with github.com/grafana/xk6-docs
 ```
 
 Requires [xk6](https://github.com/grafana/xk6). See the [xk6 documentation](https://github.com/grafana/xk6) for more build options.
-
-## Rendered output
-
-For a nicer reading experience, configure a markdown renderer in `~/.config/k6/docs.yaml`:
-
-```yaml
-renderer: glow -p 200
-```
 
 ## Agent Skill
 

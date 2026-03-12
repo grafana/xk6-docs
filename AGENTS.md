@@ -9,10 +9,10 @@
 `k6 x docs` — offline k6 documentation in the terminal. For humans and AI agents. Docs are not embedded in the binary. On first run, the extension detects the k6 version from build info, downloads a matching compressed doc bundle (`.tar.zst`) from GitHub releases, and caches it locally (`~/.local/share/k6/docs/{version}/`). Subsequent runs serve from cache with no network. A separate standalone prepare tool (`cmd/prepare/`) builds these bundles by cloning the k6-docs Hugo repository, transforming markdown into CLI-friendly format, building a searchable index (`sections.json`), and compressing everything. CI auto-publishes bundles as assets under a single `doc-bundles` GitHub release.
 
 ## Browsing
-- `k6 x docs` prints `# k6 {version}` header followed by a depth-controlled bullet tree of categories and their children (default depth: 2), and a blockquote example hint. Depth is configurable via `depth` in `~/.config/k6/docs.yaml`.
-- `k6 x docs http get` resolves args to a slug (case-insensitive) and prints the cached markdown content (trimmed). If the topic has children, a `---` separator and `**{path} subtopics:**` section is appended with a depth-controlled bullet tree of children (same `depth` config), and a blockquote example hint using the slug path form (`k6 x docs {path}/<subtopic>`).
+- `k6 x docs` prints `# k6 {version}` header followed by a depth-controlled bullet tree of categories and their children (default depth: 1), and a blockquote example hint.
+- `k6 x docs http get` resolves args to a slug (case-insensitive) and prints the cached markdown content (trimmed). If the topic has children, a `---` separator and `**{path} subtopics:**` section is appended with a depth-controlled bullet tree of children, and a blockquote example hint using the slug path form (`k6 x docs {path}/<subtopic>`).
 - `k6 x docs best-practices` prints a curated guide (embedded in the prepare tool via `//go:embed`).
-- `k6 x docs search <query>` fuzzy searches (case-insensitive, ignores punctuation, spaces, slashes) and prints an indented tree: `- {group}` with `  - {child}` underneath, no descriptions. Footer shows `Example:` with a sample navigation command. Search uses the same arg normalization and resolve rules as docs navigation (shared `normalizeArgs` and `ResolveWithLookup`), so `search browser page`, `search browser/page`, and `search javascript-api browser page` all produce the same results. Configurable `depth` controls tree depth (same as TOC/section footers).
+- `k6 x docs search <query>` fuzzy searches (case-insensitive, ignores punctuation, spaces, slashes) and prints an indented tree: `- {group}` with `  - {child}` underneath, no descriptions. Footer shows `Example:` with a sample navigation command. Search uses the same arg normalization and resolve rules as docs navigation (shared `normalizeArgs` and `ResolveWithLookup`), so `search browser page`, `search browser/page`, and `search javascript-api browser page` all produce the same results. `--depth` flag controls tree depth (same as TOC/section footers).
 
 ## Slug resolution
 - Args are normalized first: slashes are split so `browser/elementhandle` is treated identically to `browser elementhandle`.
@@ -24,8 +24,8 @@
 - Parent-prefix fallback: `k6 x docs http cookiejar clear` → tries `.../cookiejar/clear` (miss) → `.../cookiejar/cookiejar-clear` (hit). Handled by `withParentFallback` in `resolve.go`.
 
 ### Rendering
-- Optional configurable renderer (e.g. `glow`) for pretty terminal output in `~/.config/k6/docs.yaml`.
-- Configurable `depth` (int, default 2) in `~/.config/k6/docs.yaml` controls how many levels of subtopics are shown in TOC and section footers. Override via `--depth` flag (always wins over config). `printTree` is the single recursive function used everywhere.
+- Built-in markdown rendering via `glamour` library (`render.go`). Automatically renders with ANSI styling when stdout is a TTY and color is enabled. Non-TTY output (e.g. piped to an agent) is raw markdown.
+- `--depth` flag (int, default 1) controls how many levels of subtopics are shown in TOC and section footers. `printTree` is the single recursive function used everywhere.
 - Links to the current version's online docs are stripped: `[text](https://grafana.com/docs/k6/v1.6.1/foo)` → `text`.
 - Stripped: Shared shortcodes (`{{< docs/shared >}}`), code tags (`{{< code >}}`), section tags (`{{< section >}}`), React/MDX component tags (`<Glossary>`), `<br/>`, internal doc links, image links, remaining markdown links, HTML comments, YAML frontmatter.
 - Converted: Admonitions (`{{< admonition type="warning" >}}`) → `> **Warning:** ...` blockquotes.
