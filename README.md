@@ -28,14 +28,11 @@ k6 x docs best-practices               # Get best practices guidance
 
 ## Build
 
-To use the subcommand, compile a custom `k6`:
+Install [xk6](https://github.com/grafana/xk6) ([releases](https://github.com/grafana/xk6/releases) or `go install go.k6.io/xk6@latest`), then compile a custom `k6`:
 
 ```bash
 xk6 build --with github.com/grafana/xk6-docs
-# Emits a k6 in the current directory
 ```
-
-Requires [xk6](https://github.com/grafana/xk6). See the [xk6 documentation](https://github.com/grafana/xk6) for more build options.
 
 ## Agent Skill
 
