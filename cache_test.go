@@ -17,7 +17,7 @@ func TestDownloadURL(t *testing.T) {
 	t.Parallel()
 
 	got := downloadURL("v1.0.0")
-	want := "https://github.com/grafana/xk6-subcommand-docs/releases/download/doc-bundles/docs-v1.0.0.tar.zst"
+	want := "https://github.com/grafana/xk6-docs/releases/download/doc-bundles/docs-v1.0.0.tar.zst"
 	if got != want {
 		t.Errorf("downloadURL(v1.0.0) = %q, want %q", got, want)
 	}

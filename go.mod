@@ -1,4 +1,4 @@
-module github.com/grafana/xk6-subcommand-docs
+module github.com/grafana/xk6-docs
 
 go 1.24.0
 

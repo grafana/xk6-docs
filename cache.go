@@ -136,6 +136,6 @@ func extract(afs fsext.Fs, r io.Reader, destDir string) error {
 
 // downloadURL returns the release URL for a given docs version.
 func downloadURL(version string) string {
-	const base = "https://github.com/grafana/xk6-subcommand-docs/releases/download"
+	const base = "https://github.com/grafana/xk6-docs/releases/download"
 	return base + "/doc-bundles/docs-" + version + ".tar.zst"
 }

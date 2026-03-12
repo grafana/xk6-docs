@@ -1,4 +1,4 @@
-// Package docs contains the xk6-subcommand-docs extension.
+// Package docs contains the xk6-docs extension.
 package docs
 
 import "go.k6.io/k6/subcommand"

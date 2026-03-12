@@ -3,7 +3,7 @@
 ## Prerequisites
 
 Before doing ANY work, read these files in order:
-1. `/Users/inanc/grafana/xk6-subcommand-docs/AGENTS.md` — project rules, architecture, feature docs
+1. `/Users/inanc/grafana/xk6-docs/AGENTS.md` — project rules, architecture, feature docs
 2. `/Users/inanc/.claude/CLAUDE.md` — user's global coding preferences (TDD, no comments, no refactoring)
 3. This plan file
 

@@ -40,7 +40,7 @@ jobs:
           EXT=""
           if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
           xk6 build --output "k6-${GOOS}-${GOARCH}${EXT}" \
-            --with github.com/grafana/xk6-subcommand-docs=.
+            --with github.com/grafana/xk6-docs=.
       - uses: actions/upload-artifact@v4
         with:
           name: k6-${{ matrix.goos }}-${{ matrix.goarch }}

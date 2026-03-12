@@ -1,7 +1,7 @@
-[![Go Report Card](https://goreportcard.com/badge/github.com/grafana/xk6-subcommand-docs)](https://goreportcard.com/report/github.com/grafana/xk6-subcommand-docs)
-[![GitHub Actions](https://github.com/grafana/xk6-subcommand-docs/actions/workflows/ci.yml/badge.svg)](https://github.com/grafana/xk6-subcommand-docs/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/grafana/xk6-docs)](https://goreportcard.com/report/github.com/grafana/xk6-docs)
+[![GitHub Actions](https://github.com/grafana/xk6-docs/actions/workflows/ci.yml/badge.svg)](https://github.com/grafana/xk6-docs/actions/workflows/ci.yml)
 
-# xk6-subcommand-docs
+# xk6-docs
 
 **Look up any k6 doc instantly, right from your terminal.**
 
@@ -36,7 +36,7 @@ k6 x docs best-practices               # Get best practices guidance
 To use the subcommand, compile a custom `k6`:
 
 ```bash
-xk6 build --with github.com/grafana/xk6-subcommand-docs
+xk6 build --with github.com/grafana/xk6-docs
 # Emits a k6 in the current directory
 ```
 
@@ -57,7 +57,7 @@ An [agent skill](https://agentskills.io) is included so AI coding agents can loo
 Works with Claude Code, Cursor, Codex, Gemini CLI, OpenCode, GitHub Copilot, and [35+ other agents](https://agentskills.io).
 
 ```bash
-npx skills add grafana/xk6-subcommand-docs
+npx skills add grafana/xk6-docs
 ```
 
 ## Development
@@ -71,4 +71,4 @@ make prepare K6_VERSION=v1.5.x K6_DOCS_PATH=~/k6-docs   # Prepare docs bundle lo
 
 ## Contribute
 
-To report bugs or suggest features, [open an issue](https://github.com/grafana/xk6-subcommand-docs/issues).
+To report bugs or suggest features, [open an issue](https://github.com/grafana/xk6-docs/issues).

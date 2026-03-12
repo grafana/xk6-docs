@@ -28,12 +28,12 @@ for _, dep := range buildInfo.Deps {
 
 ## Repository
 
-New repo: xk6-subcommand-docs (based on xk6-subcommand-example template).
+New repo: xk6-docs (based on xk6-subcommand-example template).
 
 ## File Structure
 
 ```
-xk6-subcommand-docs/
+xk6-docs/
 ├── register.go              # init() + subcommand.RegisterExtension("docs", ...)
 ├── cmd.go                   # Cobra command definition + dispatch
 ├── docs.go                  # Section lookup, output formatting
@@ -71,7 +71,7 @@ A step in k6's release workflow fires an event:
 # In k6's release workflow
 - uses: peter-evans/repository-dispatch@v3
   with:
-    repository: grafana/xk6-subcommand-docs
+    repository: grafana/xk6-docs
     event-type: k6-release
     client-payload: '{"version": "${{ github.ref_name }}"}'
 ```
@@ -221,7 +221,7 @@ Include everything needed for writing and running k6 tests:
 ### Step 1: Scaffold the repo
 
 Create the repo from the xk6-subcommand-example template:
-- go.mod with module github.com/grafana/xk6-subcommand-docs
+- go.mod with module github.com/grafana/xk6-docs
 - register.go calling subcommand.RegisterExtension("docs", newCmd)
 - Makefile with lint, test, build, and prepare targets
 - README.md covering: what this is, CLI usage, how to build with xk6, how doc bundles work, how CI triggers
@@ -295,7 +295,7 @@ func detectK6Version() (string, error) {
 
 cache.go — download, decompress, and cache doc bundles:
 - Cache directory: ~/.local/share/k6/docs/{version}/
-- Download URL pattern: https://github.com/grafana/xk6-subcommand-docs/releases/download/docs-{version}/docs-{version}.tar.zst
+- Download URL pattern: https://github.com/grafana/xk6-docs/releases/download/docs-{version}/docs-{version}.tar.zst
 - Decompress with github.com/klauspost/compress/zstd
 - Extract tar to cache directory
 - Return cache path for section index + markdown files
@@ -383,7 +383,7 @@ Main agent merges worktree branches after each wave.
 1. make prepare K6_VERSION=v1.5.x K6_DOCS_PATH=~/grafana/k6-docs — prepare docs from local checkout
 2. make test — run all unit and integration tests
 3. make lint — run golangci-lint
-4. make build — build with xk6: xk6 build --with github.com/grafana/xk6-subcommand-docs=.
+4. make build — build with xk6: xk6 build --with github.com/grafana/xk6-docs=.
 5. Test CLI commands:
    - ./k6 x docs — should print table of contents
    - ./k6 x docs --list — should list top-level categories

@@ -2,7 +2,7 @@
 
 ## Context
 
-The initial `xk6-subcommand-docs` implementation is complete. This plan fixes formatting problems across the CLI output, adds fuzzy search, adds agent detection, and addresses code review findings. All work done by subagents using TDD (red/green/refactor). Every commit must pass `go test -race -count=1 ./...`.
+The initial `xk6-docs` implementation is complete. This plan fixes formatting problems across the CLI output, adds fuzzy search, adds agent detection, and addresses code review findings. All work done by subagents using TDD (red/green/refactor). Every commit must pass `go test -race -count=1 ./...`.
 
 **Branch:** Create `fix/formatting-and-review` from `main` before any changes.
 
@@ -294,7 +294,7 @@ var bestPracticesContent string
 
 ## Fix 8: Create Claude Code skill for `k6 x docs`
 
-Create a skill file at `xk6-subcommand-docs/.claude/skills/k6-x-docs.md` using the skill-creator skill. The skill should teach Claude Code how to use `k6 x docs` effectively:
+Create a skill file at `xk6-docs/.claude/skills/k6-x-docs.md` using the skill-creator skill. The skill should teach Claude Code how to use `k6 x docs` effectively:
 - Available commands and flags
 - Search patterns
 - How to read specific module docs
@@ -448,7 +448,7 @@ Then create all tasks via TaskCreate and launch subagents (no teams). Each subag
 
 1. `go test -race -count=1 ./...`
 2. `make prepare K6_VERSION=v1.5.x K6_DOCS_PATH=~/grafana/k6-docs` (re-generate with YAML fix)
-3. `xk6 build --with github.com/grafana/xk6-subcommand-docs=.`
+3. `xk6 build --with github.com/grafana/xk6-docs=.`
 4. Smoke tests:
    - `./k6 x docs` — relative child names, truncated descriptions, no prefix repetition
    - `./k6 x docs --list` — works (was unreachable)

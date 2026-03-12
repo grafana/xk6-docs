@@ -33,7 +33,7 @@ AFTER:  /releases/download/doc-bundles/docs-{version}.tar.zst
 The extension auto-detects which k6 version it's bundled with by reading `go.k6.io/k6` module version from Go build info. Users build with xk6:
 
 ```
-xk6 build v1.5.0 --with github.com/grafana/xk6-subcommand-docs
+xk6 build v1.5.0 --with github.com/grafana/xk6-docs
 ```
 
 Go uses Minimum Version Selection — it always picks the highest version any module requires. The extension's `go.mod` required `go.k6.io/k6 v1.6.0`, so even when a user asked xk6 for v1.5.0, Go silently resolved to v1.6.0. The extension then detected v1.6.x and showed the wrong docs.

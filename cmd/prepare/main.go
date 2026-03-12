@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	docs "github.com/grafana/xk6-subcommand-docs"
+	docs "github.com/grafana/xk6-docs"
 	"go.k6.io/k6/lib/fsext"
 	"gopkg.in/yaml.v3"
 )

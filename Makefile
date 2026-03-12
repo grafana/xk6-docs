@@ -14,7 +14,7 @@ test: ## Run tests
 	RUN_SMOKE_E2E=1 K6_BIN=$(K6_BIN) go test -race -count=1 ./...
 
 build: ## Build k6 with this extension
-	xk6 build --with github.com/grafana/xk6-subcommand-docs=.
+	xk6 build --with github.com/grafana/xk6-docs=.
 
 prepare: ## Prepare docs bundle
 	go run ./cmd/prepare --k6-version=$(K6_VERSION) --k6-docs-path=$(K6_DOCS_PATH)

@@ -26,7 +26,7 @@ After a new k6 doc bundle is released, validate that all lookup paths in `skills
 
 ## Steps
 
-1. Build the k6 binary with this extension: `go install go.k6.io/xk6/cmd/xk6@latest && xk6 build --with github.com/grafana/xk6-subcommand-docs=.`
+1. Build the k6 binary with this extension: `go install go.k6.io/xk6/cmd/xk6@latest && xk6 build --with github.com/grafana/xk6-docs=.`
 2. Run the validation script: `./skills/k6-lookup-docs/scripts/validate-paths.sh ./k6`
 3. If validation passes, stop — no changes needed.
 4. If there are broken paths or uncovered modules:
