@@ -14,8 +14,8 @@ All lookups use `./k6 x docs` followed by a topic path. Paths in this skill and 
 ```
 ./k6 x docs <parent> <child>         # Read a topic (requires full parent path)
 ./k6 x docs <parent> <child> <leaf>  # Read a nested topic
-./k6 x docs --depth 1                # TOC: top-level categories only (minimal output)
-./k6 x docs --depth 2                # TOC: one level of children (default)
+./k6 x docs --depth 1                # TOC: top-level categories only (default)
+./k6 x docs --depth 2                # TOC: one level of children
 ./k6 x docs search <term>            # Fuzzy search (returns topic paths, not content)
 ```
 

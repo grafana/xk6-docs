@@ -5,12 +5,7 @@
 
 **Look up any k6 doc instantly, right from your terminal.**
 
-> [!NOTE]
-> This extension is experimental and not officially supported by Grafana Labs.
->
-> Star the repository to help us prioritize maintenance.
-
-A [k6 extension](https://grafana.com/docs/k6/latest/extensions/) for developers and AI agents who want to stay in the terminal.
+An official [k6 extension](https://grafana.com/docs/k6/latest/extensions/) for developers and AI agents who want to stay in the terminal.
 
 - Stay in the flow:  never leave the terminal to look something up
 - Works offline: no network needed after first use

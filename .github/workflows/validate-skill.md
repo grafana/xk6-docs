@@ -30,7 +30,7 @@ After a new k6 doc bundle is released, validate that all lookup paths in `skills
 2. Run the validation script: `./skills/k6-lookup-docs/scripts/validate-paths.sh ./k6`
 3. If validation passes, stop — no changes needed.
 4. If there are broken paths or uncovered modules:
-   - For broken paths: look up the correct path using `./k6 x docs --depth 2` and `./k6 x docs search <term>`, then update the affected reference file in `skills/k6-lookup-docs/references/`.
+   - For broken paths: look up the correct path using `./k6 x docs --depth 2` or `./k6 x docs search <term>`, then update the affected reference file in `skills/k6-lookup-docs/references/`.
    - For uncovered modules: create a new reference file with an "I need to..." lookup table and key gotchas (use existing references as templates), then add a row to the workflows table in `skills/k6-lookup-docs/SKILL.md` and to the Module API Quick Reference tables.
    - Never duplicate docs content. Only provide navigation paths and gotchas.
 5. Run the validation script again to confirm all paths pass.
