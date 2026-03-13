@@ -2,6 +2,7 @@ package docs
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -51,6 +52,23 @@ Use search to find topics quickly.`,
 	}
 	cmd.AddCommand(searchCmd)
 
+	skillCmd := &cobra.Command{
+		Use:   "skill [directory]",
+		Short: "Install the agent skill for AI coding tools",
+		Long: `Install the k6 docs agent skill into a directory.
+
+Without arguments, shows a table of supported agents and their skill directories.
+With a directory argument, installs the skill files there.`,
+		Example: `  k6 x docs skill                     Show supported agents
+  k6 x docs skill ~/.claude/skills    Install for Claude Code
+  k6 x docs skill ~/.agents/skills    Install for Cursor, Codex, etc.`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runSkill(gs.FS, cmd.OutOrStdout(), gs.Stdout.IsTTY, gs.CmdArgs[0], args)
+		},
+	}
+	cmd.AddCommand(skillCmd)
+
 	return cmd
 }
 
@@ -71,7 +89,7 @@ type runCtx struct {
 // prepareRun handles setup shared by runDocs and runSearch:
 // version/cache resolution, depth, and renderer buffering.
 func prepareRun(gs *state.GlobalState, cmd *cobra.Command, opts *docsOpts) (*runCtx, error) {
-	version, cacheDir, idx, err := setup(gs, opts.version, opts.cacheDir)
+	version, cacheDir, idx, err := setup(cmd.Context(), gs, opts.version, opts.cacheDir)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +155,9 @@ func logMode(gs *state.GlobalState, isTTY bool) {
 // setup resolves the version, ensures docs are cached, and loads the index.
 // It checks flags, then env vars, then auto-detection for both version and
 // cache directory.
-func setup(gs *state.GlobalState, versionFlag, cacheDirFlg string) (version, cacheDir string, idx *Index, err error) {
+func setup(
+	ctx context.Context, gs *state.GlobalState, versionFlag, cacheDirFlg string,
+) (version, cacheDir string, idx *Index, err error) {
 	version = versionFlag
 	if version == "" {
 		version = gs.Env["K6_DOCS_VERSION"]
@@ -157,7 +177,7 @@ func setup(gs *state.GlobalState, versionFlag, cacheDirFlg string) (version, cac
 	}
 
 	if cacheDir == "" {
-		cacheDir, err = EnsureDocs(gs.FS, gs.Env, version, http.DefaultClient)
+		cacheDir, err = EnsureDocs(ctx, gs.FS, gs.Env, version, http.DefaultClient)
 		if err != nil {
 			return "", "", nil, fmt.Errorf("ensure docs: %w", err)
 		}

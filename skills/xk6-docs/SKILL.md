@@ -5,18 +5,20 @@ description: Look up k6 documentation to write k6 load tests, browser tests, and
 
 # k6 Documentation Lookup
 
-Read k6 docs via `./k6 x docs` to write correct k6 test scripts. Docs are local and cached.
+Read k6 docs via `<binary> x docs` to write correct k6 test scripts. Docs are local and cached.
+
+**If `<binary>` is not found:** tell the user to re-run `k6 x docs skill <dir>` to update the skill, then stop. Do not attempt fallbacks.
 
 ## Command Syntax
 
-All lookups use `./k6 x docs` followed by a topic path. Paths in this skill and its references omit the `./k6 x docs` prefix.
+All lookups use `<binary> x docs` followed by a topic path. Paths in this skill and its references omit the `<binary> x docs` prefix.
 
 ```
-./k6 x docs <parent> <child>         # Read a topic (requires full parent path)
-./k6 x docs <parent> <child> <leaf>  # Read a nested topic
-./k6 x docs --depth 1                # TOC: top-level categories only (default)
-./k6 x docs --depth 2                # TOC: one level of children
-./k6 x docs search <term>            # Fuzzy search (returns topic paths, not content)
+<binary> x docs <parent> <child>         # Read a topic (requires full parent path)
+<binary> x docs <parent> <child> <leaf>  # Read a nested topic
+<binary> x docs --depth 1                # TOC: top-level categories only (default)
+<binary> x docs --depth 2                # TOC: one level of children
+<binary> x docs search <term>            # Fuzzy search (returns topic paths, not content)
 ```
 
 ## Critical Rules
