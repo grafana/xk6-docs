@@ -6,7 +6,7 @@
 
 ---
 
-`k6 x docs` — offline k6 documentation in the terminal. For humans and AI agents. Docs are not embedded in the binary. On first run, the extension detects the k6 version from build info, downloads a matching compressed doc bundle (`.tar.zst`) from GitHub releases, and caches it locally (`~/.local/share/k6/docs/{version}/`). Subsequent runs serve from cache with no network. A separate standalone prepare tool (`cmd/prepare/`) builds these bundles by cloning the k6-docs Hugo repository, transforming markdown into CLI-friendly format, building a searchable index (`sections.json`), and compressing everything. CI auto-publishes bundles as assets under a single `doc-bundles` GitHub release.
+`k6 x docs` — offline k6 documentation in the terminal. For humans and AI agents. Docs are not embedded in the binary. On first run, the extension detects the k6 version from build info, downloads a matching compressed doc bundle (`.tar.zst`) from GitHub releases, and caches it locally (`~/.local/share/k6/docs/{version}/`). Subsequent runs serve from cache with no network. Cached bundles are checked for staleness every 24 hours via ETag comparison; stale bundles are re-downloaded automatically. A separate standalone prepare tool (`cmd/prepare/`) builds these bundles by cloning the k6-docs Hugo repository, transforming markdown into CLI-friendly format, building a searchable index (`sections.json`), and compressing everything. CI auto-publishes bundles as assets under a single `doc-bundles` GitHub release.
 
 ## Browsing
 - `k6 x docs` prints `# k6 {version}` header followed by a depth-controlled bullet tree of categories and their children (default depth: 1), and a blockquote example hint.
@@ -49,14 +49,22 @@
 - Outputs: `dist/sections.json`, `dist/markdown/**/*.md`, `dist/best_practices.md`.
 
 ### Agent skill (`skills/xk6-docs/`)
-- Installable via `npx skills add grafana/xk6-docs`. Agent-independent (works with Claude Code, Cursor, Codex, etc.).
+- Installable via `k6 x docs skill <dir>` (embeds SKILL.md + references via `//go:embed`, templates `<binary>` placeholder with the running binary's absolute path via `os.Args[0]`).
+- `k6 x docs skill` (no args) shows a glamour-rendered table of supported agents and their skill directories.
+- SKILL.md tells agents: if the binary path fails, tell the user to re-run `k6 x docs skill <dir>` and stop.
 - Never duplicate docs content (code examples, API descriptions). Only provide navigation paths and gotchas that save agents from trial-and-error.
 - Each reference is a single module/area workflow.
 - Before updating the skill, use `./k6 x docs` yourself to verify paths and discover gotchas.
 - Run `skills/xk6-docs/scripts/validate-paths.sh ./k6` to find broken paths and uncovered modules.
+
+### Cache staleness (`cache.go`)
+- On download, stores ETag in `.etag` and current timestamp in `.last_check` inside the cache dir.
+- On cache hit, if `.last_check` is >24h old (or missing), does a HEAD request to compare ETags.
+- If ETag changed: re-downloads the bundle. If same: updates `.last_check`. On network error: silently serves from cache.
 
 ### CI/CD
 - CI: lint + test + build on push/PR to main.
 - Release: triggered by `vx.y.z` tag push. Builds k6 binaries (with this extension via xk6) for linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64. Publishes binaries + `checksums.txt` to a GitHub release.
 - Release bundle: triggered by k6 release dispatch or manual. Clones k6-docs, runs prepare, compresses with `zstd --ultra -22`, publishes asset to the single `doc-bundles` GitHub release.
 - Release poll: manual fallback (schedule disabled). Polls k6 releases, builds if asset missing from the `doc-bundles` release.
+- Nightly bundle: runs daily at 3 AM UTC (or manual). Checks each existing bundle asset against latest k6-docs commits; rebuilds and re-uploads stale bundles.

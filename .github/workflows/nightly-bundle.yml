@@ -1,0 +1,71 @@
+name: Nightly Doc Bundle Rebuild
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  rebuild-stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Find stale bundles
+        id: stale
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ASSETS=$(gh release view doc-bundles --json assets \
+            -q '.assets[] | select(.name | endswith(".tar.zst")) | "\(.name) \(.updatedAt)"')
+
+          if [ -z "$ASSETS" ]; then
+            echo "No assets found in doc-bundles release"
+            echo "versions=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          STALE_VERSIONS=""
+          while IFS=' ' read -r name updated_at; do
+            version="${name#docs-}"
+            version="${version%.tar.zst}"
+
+            # Check commits only for this version's docs directory.
+            DOCS_DATE=$(gh api "repos/grafana/k6-docs/commits?per_page=1&path=docs/sources/k6/${version}" \
+              --jq '.[0].commit.committer.date' 2>/dev/null || echo "")
+
+            echo "Asset $name updated_at=$updated_at docs_date=${DOCS_DATE:-unknown}"
+
+            if [ -n "$DOCS_DATE" ] && [[ "$DOCS_DATE" > "$updated_at" ]]; then
+              echo "  → STALE"
+              STALE_VERSIONS="${STALE_VERSIONS}${version} "
+            else
+              echo "  → up to date"
+            fi
+          done <<< "$ASSETS"
+
+          STALE_VERSIONS=$(echo "$STALE_VERSIONS" | xargs)
+          echo "Stale versions: ${STALE_VERSIONS:-none}"
+          echo "versions=$STALE_VERSIONS" >> "$GITHUB_OUTPUT"
+      - name: Rebuild stale bundles
+        if: steps.stale.outputs.versions != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sudo apt-get update && sudo apt-get install -y zstd
+          git clone --depth 1 https://github.com/grafana/k6-docs.git /tmp/k6-docs
+
+          for VERSION in ${{ steps.stale.outputs.versions }}; do
+            echo "=== Rebuilding $VERSION ==="
+            rm -rf dist
+            go run ./cmd/prepare --k6-version="$VERSION" --k6-docs-path=/tmp/k6-docs --output-dir=dist
+            BUNDLE="docs-${VERSION}.tar.zst"
+            tar -cf - -C dist . | zstd --ultra -22 -o "$BUNDLE"
+
+            gh release delete-asset doc-bundles "$BUNDLE" --yes 2>/dev/null || true
+            gh release upload doc-bundles "$BUNDLE"
+
+            echo "=== Done: $BUNDLE ==="
+          done

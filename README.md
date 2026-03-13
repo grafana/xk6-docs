@@ -26,9 +26,11 @@ k6 x docs search "close context"       # Don't worry about exact names
 k6 x docs best-practices               # Get best practices guidance
 ```
 
-## Build
+## Install
 
-Install [xk6](https://github.com/grafana/xk6) ([releases](https://github.com/grafana/xk6/releases) or `go install go.k6.io/xk6@latest`), then compile a custom `k6`:
+Download a pre-built binary from [releases](https://github.com/grafana/xk6-docs/releases) and use it as your `k6`. It's a drop-in replacement — everything k6 does, plus `k6 x docs`.
+
+Or build it yourself with [xk6](https://github.com/grafana/xk6):
 
 ```bash
 xk6 build --with github.com/grafana/xk6-docs
@@ -40,9 +42,14 @@ An [agent skill](https://agentskills.io) is included so AI coding agents can loo
 
 Works with Claude Code, Cursor, Codex, Gemini CLI, OpenCode, GitHub Copilot, and [35+ other agents](https://agentskills.io).
 
+Install the skill directly from your k6 binary:
+
 ```bash
-npx skills add grafana/xk6-docs
+k6 x docs skill ~/.claude/skills    # Claude Code
+k6 x docs skill ~/.agents/skills    # Cursor, Codex, Gemini CLI, etc.
 ```
+
+Run `k6 x docs skill` without arguments to see all supported agents.
 
 ## Development
 
