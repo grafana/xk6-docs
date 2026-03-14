@@ -18,7 +18,13 @@ func docCategories() []Category {
 		{Name: "testing-guides"},
 		{Name: "examples"},
 		{Name: "results-output"},
-		{Name: "reference", Subcategories: []string{"glossary"}},
+		{Name: "extensions"},
+		{Name: "set-up"},
+		{Name: "get-started"},
+		{Name: "release-notes"},
+		{Name: "grafana-cloud-k6"},
+		{Name: "k6-studio"},
+		{Name: "reference"},
 	}
 }
 
