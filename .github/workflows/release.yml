@@ -70,3 +70,4 @@ jobs:
             - Configurable subtopic depth (`--depth` flag)
             - Agent-friendly raw output when piped (non-TTY)
             - Install agent skill directly: `k6 x docs skill ~/.claude/skills` (Claude Code, Cursor, Codex, and more)
+          generate_release_notes: true
