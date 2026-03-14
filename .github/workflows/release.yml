@@ -60,4 +60,13 @@ jobs:
           files: |
             k6-*
             checksums.txt
-          generate_release_notes: true
+          body: |
+            - Browse k6 docs offline (`k6 x docs http get`)
+            - Fuzzy search across all topics (`k6 x docs search <term>`)
+            - Best practices guide (`k6 x docs best-practices`)
+            - Auto-download version-matched doc bundles on first run
+            - Docs stay fresh: cached bundles re-checked every 24h via ETag
+            - Built-in markdown rendering for terminals
+            - Configurable subtopic depth (`--depth` flag)
+            - Agent-friendly raw output when piped (non-TTY)
+            - Install agent skill directly: `k6 x docs skill ~/.claude/skills` (Claude Code, Cursor, Codex, and more)
