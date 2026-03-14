@@ -20,12 +20,8 @@ func TestSkillFilesEmbedded(t *testing.T) {
 		t.Fatal("SKILL.md is empty")
 	}
 
-	entries, err := skillFiles.ReadDir("skills/xk6-docs/references")
-	if err != nil {
-		t.Fatalf("references dir not embedded: %v", err)
-	}
-	if len(entries) == 0 {
-		t.Fatal("no reference files embedded")
+	if _, err := skillFiles.ReadDir("skills/xk6-docs/scripts"); err != nil {
+		t.Fatalf("scripts dir not embedded: %v", err)
 	}
 }
 
@@ -51,11 +47,6 @@ func TestInstallSkill(t *testing.T) {
 	}
 	if strings.Contains(content, "<binary>") {
 		t.Error("SKILL.md still contains '<binary>' placeholder")
-	}
-
-	httpRef := filepath.Join(destDir, "xk6-docs", "references", "http.md")
-	if _, err := afs.Stat(httpRef); err != nil {
-		t.Fatalf("http.md reference not installed: %v", err)
 	}
 
 	scriptPath := filepath.Join(destDir, "xk6-docs", "scripts", "validate-paths.sh")

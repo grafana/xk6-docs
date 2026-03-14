@@ -11,7 +11,7 @@ func TestIsCategory(t *testing.T) {
 		}
 	}
 
-	unknown := []string{"get-started", "set-up", "", "foo"}
+	unknown := []string{"", "foo", "shared"}
 	for _, name := range unknown {
 		if isCategory(name) {
 			t.Errorf("isCategory(%q) = true, want false", name)
@@ -33,9 +33,7 @@ func TestIsIncludedDocsPath(t *testing.T) {
 
 	tests := []tc{
 		// Unknown categories are excluded.
-		{"get-started excluded", "get-started/welcome", false},
-		{"extensions included", "extensions/overview", true},
-		{"set-up excluded", "set-up/install", false},
+		{"shared excluded", "shared/snippet", false},
 		{"empty path excluded", "", false},
 
 		// Leading/trailing slash normalization.

@@ -241,19 +241,9 @@ func loadOutputIndex(t *testing.T, afs fsext.Fs, outputDir, version string) (doc
 func assertNoExcludedCategories(t *testing.T, sections []docs.Section) {
 	t.Helper()
 
-	excluded := map[string]bool{
-		"get-started":      true,
-		"set-up":           true,
-		"grafana-cloud-k6": true,
-		"release-notes":    true,
-		"k6-studio":        true,
-	}
 	for _, s := range sections {
-		if excluded[s.Category] {
+		if s.Category == "shared" {
 			t.Errorf("section %q has excluded category %q", s.Slug, s.Category)
-		}
-		if s.Category == "reference" && s.Slug != "reference/glossary" {
-			t.Errorf("reference should only include glossary, found %q", s.Slug)
 		}
 	}
 }
@@ -281,7 +271,9 @@ func TestRunWithMockDocs(t *testing.T) {
 		"using-k6/checks",
 		"using-k6/thresholds",
 		"reference/glossary",
+		"reference/archive",
 		"extensions",
+		"get-started",
 	}
 	for _, slug := range expectedSlugs {
 		if _, ok := bySlug[slug]; !ok {
@@ -291,9 +283,7 @@ func TestRunWithMockDocs(t *testing.T) {
 
 	// Check excluded sections are absent.
 	excludedSlugs := []string{
-		"get-started",
-		"reference",         // _index.md should be excluded (only glossary included)
-		"reference/archive", // only glossary from reference
+		"shared",
 	}
 	for _, slug := range excludedSlugs {
 		if _, ok := bySlug[slug]; ok {
