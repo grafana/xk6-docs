@@ -180,6 +180,16 @@ weight: 10
 # Archive
 `)
 
+	// Create included extensions category.
+	writeFile(t, afs, filepath.Join(versionRoot, "extensions", "_index.md"), `---
+title: 'Extensions'
+description: 'k6 extensions.'
+weight: 50
+---
+
+# Extensions
+`)
+
 	// Create excluded categories.
 	writeFile(t, afs, filepath.Join(versionRoot, "get-started", "_index.md"), `---
 title: 'Get Started'
@@ -188,15 +198,6 @@ weight: 01
 ---
 
 # Get Started
-`)
-
-	writeFile(t, afs, filepath.Join(versionRoot, "extensions", "_index.md"), `---
-title: 'Extensions'
-description: 'k6 extensions.'
-weight: 50
----
-
-# Extensions
 `)
 
 	return afs, root
@@ -243,7 +244,6 @@ func assertNoExcludedCategories(t *testing.T, sections []docs.Section) {
 	excluded := map[string]bool{
 		"get-started":      true,
 		"set-up":           true,
-		"extensions":       true,
 		"grafana-cloud-k6": true,
 		"release-notes":    true,
 		"k6-studio":        true,
@@ -281,6 +281,7 @@ func TestRunWithMockDocs(t *testing.T) {
 		"using-k6/checks",
 		"using-k6/thresholds",
 		"reference/glossary",
+		"extensions",
 	}
 	for _, slug := range expectedSlugs {
 		if _, ok := bySlug[slug]; !ok {
@@ -291,7 +292,6 @@ func TestRunWithMockDocs(t *testing.T) {
 	// Check excluded sections are absent.
 	excludedSlugs := []string{
 		"get-started",
-		"extensions",
 		"reference",         // _index.md should be excluded (only glossary included)
 		"reference/archive", // only glossary from reference
 	}
