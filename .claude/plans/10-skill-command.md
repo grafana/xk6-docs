@@ -41,3 +41,38 @@ Users may not have xk6-docs compiled into their k6. Doc bundles can go stale.
 - No Go test needed — just the workflow file
 
 ### Step 7: Update AGENTS.md, README
+
+---
+
+## What changed
+
+### Problems
+
+**AI agents couldn't look up docs.** After installing the skill, agents would immediately fail
+trying to run `k6 x docs` because users' k6 (installed via Homebrew, download, or custom build)
+doesn't have the docs extension. There was no way for an agent to find the right binary to use.
+
+**Docs silently went out of date.** Once downloaded, doc bundles were served from cache forever.
+Fixes published to k6-docs between k6 releases were invisible to users — they'd get wrong or
+outdated information with no indication anything was stale.
+
+### Installing the skill now takes one command
+
+`k6 x docs skill ~/.claude/skills` installs the agent skill directly from the user's own k6
+binary, referencing the exact binary they already run their tests with. Running it without
+arguments shows a table of supported agents (Claude Code, Cursor, Codex, etc.) with the directory
+to use for each. The previous npx install had no way to connect the skill to the user's binary,
+so most setups failed silently the first time an agent tried to look something up.
+
+### Docs stay fresh automatically
+
+Cached doc bundles are re-checked once per day — silently re-downloaded if updated, or served
+from cache without error if the network is unavailable. Doc fixes in k6-docs used to be invisible
+to users until they manually cleared the cache or waited for the next k6 release.
+
+### Bundle updates are targeted per k6 version
+
+A nightly CI job checks whether k6-docs has new commits for each version's specific content
+directory (e.g. `docs/sources/k6/v1.6.x`) and only rebuilds the bundles that actually changed.
+Previously, bundles were only rebuilt on k6 releases, so doc fixes between releases never reached
+users at all.
