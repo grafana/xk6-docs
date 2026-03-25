@@ -26,16 +26,6 @@ k6 x docs search "close context"       # Don't worry about exact names
 k6 x docs best-practices               # Get best practices guidance
 ```
 
-## Install
-
-Download a pre-built binary from [releases](https://github.com/grafana/xk6-docs/releases) and use it as your `k6`. It's a drop-in replacement — everything k6 does, plus `k6 x docs`.
-
-Or build it yourself with [xk6](https://github.com/grafana/xk6):
-
-```bash
-xk6 build --with github.com/grafana/xk6-docs
-```
-
 ## Agent Skill
 
 An [agent skill](https://agentskills.io) is included so AI coding agents can look up k6 docs efficiently — fewer commands, no guessing paths, no wasted tokens.
@@ -51,7 +41,19 @@ k6 x docs skill ~/.agents/skills    # Cursor, Codex, Gemini CLI, etc.
 
 Run `k6 x docs skill` without arguments to see all supported agents.
 
-## Development
+## Install (for k6 below 1.7.0)
+
+Download a pre-built binary from [releases](https://github.com/grafana/xk6-docs/releases) and use it as your `k6`. It's a drop-in replacement — everything k6 does, plus `k6 x docs`.
+
+Or build it yourself with [xk6](https://github.com/grafana/xk6):
+
+```bash
+xk6 build --with github.com/grafana/xk6-docs
+```
+
+## Contribute
+
+To report bugs or suggest features, [open an issue](https://github.com/grafana/xk6-docs/issues).
 
 ```
 make test                                               # Run tests
@@ -59,7 +61,3 @@ make lint                                               # Run linter
 make build                                              # Build k6 with this extension
 make prepare K6_VERSION=v1.5.x K6_DOCS_PATH=~/k6-docs   # Prepare docs bundle locally
 ```
-
-## Contribute
-
-To report bugs or suggest features, [open an issue](https://github.com/grafana/xk6-docs/issues).
