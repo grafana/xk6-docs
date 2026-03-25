@@ -43,9 +43,10 @@ Run `k6 x docs skill` without arguments to see all supported agents.
 
 ## Install (for k6 below 1.7.0)
 
-Download a pre-built binary from [releases](https://github.com/grafana/xk6-docs/releases) and use it as your `k6`. It's a drop-in replacement — everything k6 does, plus `k6 x docs`.
+> [!NOTE]
+> For k6 1.7.0+, k6 x docs is automatically available. You don't need to install anything besides k6.
 
-Or build it yourself with [xk6](https://github.com/grafana/xk6):
+Download a pre-built binary from [releases](https://github.com/grafana/xk6-docs/releases) and use it as your `k6`. It's a drop-in replacement — everything k6 does, plus `k6 x docs`. Or build it yourself with [xk6](https://github.com/grafana/xk6):
 
 ```bash
 xk6 build --with github.com/grafana/xk6-docs
