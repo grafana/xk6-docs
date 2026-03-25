@@ -2,21 +2,29 @@
 k6-docs --cache-dir $WORK/cache --version v0.55.x search guide
 cmp stdout golden-guide.txt
 
-# Description match grouped by JS API module
+# Single result from description match shows doc
 k6-docs --cache-dir $WORK/cache --version v0.55.x search 'fn-one operation'
-cmp stdout golden-fn-one-operation.txt
+stdout '## modA.fnOne'
 
 # Multi-group sorted alphabetically
 k6-docs --cache-dir $WORK/cache --version v0.55.x search k6
 cmp stdout golden-k6.txt
 
-# Body content match
+# Single result from body match shows doc
 k6-docs --cache-dir $WORK/cache --version v0.55.x search 'TopicTwo content'
-stdout 'beta'
+stdout '# TopicTwo'
 
 # No results
 k6-docs --cache-dir $WORK/cache --version v0.55.x search zzzznotfound
 stdout '\(no results\)'
+
+# Search example hint has no blank line before it
+k6-docs --cache-dir $WORK/cache --version v0.55.x --depth 2 search k6
+! stdout '^\n>'
+
+# Single group goes to deepest match, not group parent
+k6-docs --cache-dir $WORK/cache --version v0.55.x search child-a-clear
+stdout 'ChildA.clear'
 
 # Missing arg errors
 ! k6-docs --cache-dir $WORK/cache --version v0.55.x search
@@ -27,7 +35,18 @@ stderr 'requires at least 1 arg'
 - gamma
 -- golden-fn-one-operation.txt --
 - k6-mod-a
+-- golden-fn-one-depth2.txt --
+- k6-mod-a
+  - fn-one
+> Example: `k6 x docs mod-a fn-one`
 -- golden-k6.txt --
 - k6-lib-c
 - k6-mod-a
+  - child-a
+    - clear
+  - child-a/child-a-clear
+  - fn-one
+  - fn-two
 - k6-mod-b
+  - leaf-one
+> Example: `k6 x docs mod-a child-a`

@@ -192,9 +192,22 @@ func printSearch(env *docsEnv, w io.Writer, idx *Index, args []string) {
 	}
 
 	groups, groupOrder := groupSearchResults(results)
+
+	if len(groupOrder) == 1 {
+		members := groups[groupOrder[0]]
+		best := members[0]
+		for _, m := range members[1:] {
+			if len(m.Slug) > len(best.Slug) {
+				best = m
+			}
+		}
+		printSection(env, w, idx, best)
+		return
+	}
+
 	sort.Strings(groupOrder)
 
-	depth := env.Depth
+	const searchDepth = 100
 	var firstChildSlug string
 
 	for _, key := range groupOrder {
@@ -206,18 +219,14 @@ func printSearch(env *docsEnv, w io.Writer, idx *Index, args []string) {
 		groupSlug := resolveGroupSlug(idx, key, members)
 		_, _ = fmt.Fprintf(w, "- %s\n", key)
 
-		if depth < 2 {
-			continue
-		}
-
-		childSlug := printSearchChildren(w, idx, members, groupSlug, depth)
+		childSlug := printSearchChildren(w, idx, members, groupSlug, searchDepth)
 		if firstChildSlug == "" {
 			firstChildSlug = childSlug
 		}
 	}
 
 	if firstChildSlug != "" {
-		printExample(w, "k6 x docs "+slugToArgs(firstChildSlug))
+		_, _ = fmt.Fprintf(w, "> Example: `k6 x docs %s`\n", slugToArgs(firstChildSlug))
 	}
 }
 

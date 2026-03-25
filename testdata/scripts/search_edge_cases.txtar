@@ -2,13 +2,13 @@
 k6-docs --cache-dir $WORK/cache --version v0.55.x search zzzznotfound
 cmp stdout golden-no-results.txt
 
-# Multiple words joined by spaces
+# Single result from multi-word search shows doc
 k6-docs --cache-dir $WORK/cache --version v0.55.x search TopicTwo content
-stdout 'beta'
+stdout '# TopicTwo'
 
-# Normalized match: spaces/dashes ignored
+# Normalized match: single group shows doc directly
 k6-docs --cache-dir $WORK/cache --version v0.55.x search child-a
-stdout 'k6-mod-a'
+stdout '# ChildA'
 
 # bare javascript-api excluded from grouping
 k6-docs --cache-dir $WORK/cache --version v0.55.x search k6
@@ -20,4 +20,11 @@ cmp stdout golden-k6.txt
 -- golden-k6.txt --
 - k6-lib-c
 - k6-mod-a
+  - child-a
+    - clear
+  - child-a/child-a-clear
+  - fn-one
+  - fn-two
 - k6-mod-b
+  - leaf-one
+> Example: `k6 x docs mod-a child-a`

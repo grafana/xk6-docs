@@ -156,11 +156,11 @@ func TestPrintSearchArgs(t *testing.T) {
 		args []string
 		want string
 	}{
-		{name: "slash", args: []string{"k6-mod-b/leaf-one"}, want: "k6-mod-b"},
-		{name: "space", args: []string{"k6-mod-b", "leaf-one"}, want: "k6-mod-b"},
-		{name: "bare_slash", args: []string{"mod-b/leaf-one"}, want: "k6-mod-b"},
-		{name: "full_slug", args: []string{"javascript-api", "k6-mod-b", "leaf-one"}, want: "k6-mod-b"},
-		{name: "full_slug_bare", args: []string{"javascript-api", "mod-b", "leaf-one"}, want: "k6-mod-b"},
+		{name: "slash", args: []string{"k6-mod-b/leaf-one"}, want: "LeafOne"},
+		{name: "space", args: []string{"k6-mod-b", "leaf-one"}, want: "LeafOne"},
+		{name: "bare_slash", args: []string{"mod-b/leaf-one"}, want: "LeafOne"},
+		{name: "full_slug", args: []string{"javascript-api", "k6-mod-b", "leaf-one"}, want: "LeafOne"},
+		{name: "full_slug_bare", args: []string{"javascript-api", "mod-b", "leaf-one"}, want: "LeafOne"},
 	}
 
 	for _, tt := range tests {
@@ -202,28 +202,28 @@ func TestPrintSearchDepth(t *testing.T) {
 		t.Fatalf("LoadIndex: %v", err)
 	}
 
-	t.Run("depth 1 shows only groups", func(t *testing.T) {
+	t.Run("search always shows children regardless of depth", func(t *testing.T) {
 		t.Parallel()
 		env := &docsEnv{FS: afs, CacheDir: dir, Version: "v0.55.x", Depth: 1}
 		var buf strings.Builder
-		printSearch(env, &buf, idx, []string{"k6-mod-b"})
+		printSearch(env, &buf, idx, []string{"k6"})
 		got := buf.String()
-		if !strings.Contains(got, "- k6-mod-b\n") {
-			t.Errorf("depth 1: expected group header, got %q", got)
+		if !strings.Contains(got, "- k6-mod-a\n") {
+			t.Errorf("expected group header, got %q", got)
 		}
-		if strings.Contains(got, "  - ") {
-			t.Errorf("depth 1: should not show children, got %q", got)
+		if !strings.Contains(got, "  - fn-one") {
+			t.Errorf("depth 1 search should still show children, got %q", got)
 		}
 	})
 
-	t.Run("depth 2 shows groups and children", func(t *testing.T) {
+	t.Run("single group auto-navigates to deepest match", func(t *testing.T) {
 		t.Parallel()
-		env := &docsEnv{FS: afs, CacheDir: dir, Version: "v0.55.x", Depth: 2}
+		env := &docsEnv{FS: afs, CacheDir: dir, Version: "v0.55.x", Depth: 1}
 		var buf strings.Builder
-		printSearch(env, &buf, idx, []string{"k6-mod-b"})
+		printSearch(env, &buf, idx, []string{"child-a"})
 		got := buf.String()
-		if !strings.Contains(got, "  - leaf-one") {
-			t.Errorf("depth 2: expected children, got %q", got)
+		if !strings.Contains(got, "ChildA.clear") {
+			t.Errorf("single group: expected deepest match (ChildA.clear), got %q", got)
 		}
 	})
 }
