@@ -1,4 +1,4 @@
 dist/
-k6
+/k6
 *.tar.zst
 .DS_Store
