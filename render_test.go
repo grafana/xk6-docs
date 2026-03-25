@@ -90,6 +90,38 @@ func TestRenderSkippedWhenNoColor(t *testing.T) {
 	}
 }
 
+func TestPagerPipesRenderedOutput(t *testing.T) {
+	t.Parallel()
+
+	afs, cacheDir := setupTestCache(t)
+	gs := newTestGlobalState(t, afs)
+	gs.Stdout.IsTTY = false
+	gs.Env["PAGER"] = "cat"
+
+	var stdoutBuf, cmdBuf bytes.Buffer
+	gs.Stdout.Writer = &stdoutBuf
+
+	cmd := newCmd(gs)
+	cmd.SetOut(&cmdBuf)
+	cmd.SetArgs([]string{"-p", "--cache-dir", cacheDir, "--version", "v0.55.x", "mod-a", "fn-one"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("cmd.Execute: %v", err)
+	}
+
+	// Pager mode: glamour-rendered output piped through PAGER=cat to gs.Stdout.Writer.
+	got := stdoutBuf.String()
+	if !strings.Contains(got, "modA.fnOne") {
+		t.Errorf("expected topic content, got: %s", got)
+	}
+	if !strings.Contains(got, "\x1b[") {
+		t.Errorf("expected ANSI escape codes, got: %s", got)
+	}
+	if cmdBuf.Len() > 0 {
+		t.Errorf("expected no raw output in cmd buffer, got: %s", cmdBuf.String())
+	}
+}
+
 func TestRenderSkippedWhenNonTTY(t *testing.T) {
 	t.Parallel()
 

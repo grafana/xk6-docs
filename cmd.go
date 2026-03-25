@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os/exec"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"go.k6.io/k6/cmd/state"
@@ -43,6 +45,7 @@ Use search to find topics quickly.`,
 	cmd.PersistentFlags().StringVar(&opts.version, "version", "", "Override k6 version for docs lookup")
 	cmd.PersistentFlags().StringVar(&opts.cacheDir, "cache-dir", "", "Override cache directory")
 	cmd.PersistentFlags().IntVar(&opts.depth, "depth", 0, "Override subtopic depth (default 1)")
+	cmd.PersistentFlags().BoolVarP(&opts.pager, "pager", "p", false, "Display with pager")
 
 	_ = cmd.RegisterFlagCompletionFunc("version", cobra.NoFileCompletions)
 	_ = cmd.RegisterFlagCompletionFunc("cache-dir", completionDirs)
@@ -85,6 +88,7 @@ type docsOpts struct {
 	version  string
 	cacheDir string
 	depth    int
+	pager    bool
 }
 
 // runCtx holds the common state prepared by prepareRun for both docs and search.
@@ -114,7 +118,7 @@ func prepareRun(gs *state.GlobalState, cmd *cobra.Command, opts *docsOpts) (*run
 	w := baseW
 	var buf *bytes.Buffer
 
-	if gs.Stdout.IsTTY && !gs.Flags.NoColor {
+	if gs.Stdout.IsTTY && !gs.Flags.NoColor || opts.pager {
 		buf = &bytes.Buffer{}
 		w = buf
 	}
@@ -122,6 +126,29 @@ func prepareRun(gs *state.GlobalState, cmd *cobra.Command, opts *docsOpts) (*run
 	flush := func() error {
 		if buf == nil || buf.Len() == 0 {
 			return nil
+		}
+		if opts.pager {
+			pagerCmd := gs.Env["PAGER"]
+			if pagerCmd == "" {
+				pagerCmd = "less -r"
+			}
+			parts := strings.Split(pagerCmd, " ")
+			c := exec.CommandContext(cmd.Context(), parts[0], parts[1:]...) //nolint:gosec // user's $PAGER
+			c.Stdout = gs.Stdout.Writer
+			c.Stderr = gs.Stderr.Writer
+			stdin, err := c.StdinPipe()
+			if err != nil {
+				return err
+			}
+			if err := c.Start(); err != nil {
+				return err
+			}
+			err = renderMarkdown(stdin, buf.String())
+			_ = stdin.Close()
+			if waitErr := c.Wait(); err == nil {
+				err = waitErr
+			}
+			return err
 		}
 		return renderMarkdown(gs.Stdout.Writer, buf.String())
 	}
