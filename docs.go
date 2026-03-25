@@ -51,7 +51,7 @@ func childName(childSlug, parentSlug string) string {
 // For javascript-api slugs, strips the prefix and k6- from the first segment.
 func slugToArgs(slug string) string {
 	parts := strings.Split(slug, "/")
-	if parts[0] == "javascript-api" && len(parts) > 1 {
+	if parts[0] == jsAPISlug && len(parts) > 1 {
 		parts = parts[1:]
 		parts[0] = strings.TrimPrefix(parts[0], "k6-")
 	}
@@ -143,7 +143,7 @@ func printSection(env *docsEnv, w io.Writer, idx *Index, section *Section) {
 // JavaScript API sections group by module (second segment); others by first segment.
 func searchGroupKey(slug string) string {
 	parts := strings.SplitN(slug, "/", 3)
-	if parts[0] == "javascript-api" && len(parts) > 1 {
+	if parts[0] == jsAPISlug && len(parts) > 1 {
 		return parts[1]
 	}
 	return parts[0]
@@ -227,7 +227,7 @@ func groupSearchResults(results []*Section) (map[string][]*Section, []string) {
 	var order []string
 
 	for _, sec := range results {
-		if sec.Slug == "javascript-api" {
+		if sec.Slug == jsAPISlug {
 			continue
 		}
 		key := searchGroupKey(sec.Slug)

@@ -37,9 +37,16 @@ Use search to find topics quickly.`,
 		},
 	}
 
+	completionTopics := newTopicCompletion(gs, &opts)
+	cmd.ValidArgsFunction = completionTopics
+
 	cmd.PersistentFlags().StringVar(&opts.version, "version", "", "Override k6 version for docs lookup")
 	cmd.PersistentFlags().StringVar(&opts.cacheDir, "cache-dir", "", "Override cache directory")
 	cmd.PersistentFlags().IntVar(&opts.depth, "depth", 0, "Override subtopic depth (default 1)")
+
+	_ = cmd.RegisterFlagCompletionFunc("version", cobra.NoFileCompletions)
+	_ = cmd.RegisterFlagCompletionFunc("cache-dir", completionDirs)
+	_ = cmd.RegisterFlagCompletionFunc("depth", cobra.NoFileCompletions)
 
 	searchCmd := &cobra.Command{
 		Use:   "search <term>",
@@ -50,6 +57,7 @@ Use search to find topics quickly.`,
 			return runSearch(gs, cmd, args, &opts)
 		},
 	}
+	searchCmd.ValidArgsFunction = completionTopics
 	cmd.AddCommand(searchCmd)
 
 	skillCmd := &cobra.Command{
@@ -67,6 +75,7 @@ With a directory argument, installs the skill files there.`,
 			return runSkill(gs.FS, cmd.OutOrStdout(), gs.Stdout.IsTTY, gs.CmdArgs[0], args)
 		},
 	}
+	skillCmd.ValidArgsFunction = completionDirs
 	cmd.AddCommand(skillCmd)
 
 	return cmd

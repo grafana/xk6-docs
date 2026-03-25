@@ -50,7 +50,7 @@ func ResolveWithLookup(args []string, exists func(string) bool) string {
 		name := strings.TrimPrefix(args[0], "k6-")
 		rest := args[1:]
 		parts := append([]string{name}, rest...)
-		slug = "javascript-api/" + strings.Join(parts, "/")
+		slug = jsAPISlug + "/" + strings.Join(parts, "/")
 	}
 
 	slug = withK6Prefix(slug, exists)
@@ -63,7 +63,7 @@ func ResolveWithLookup(args []string, exists func(string) bool) string {
 // Without a lookup function, it defaults to the k6-prefixed form
 // since most JS API modules use it.
 func withK6Prefix(slug string, exists func(string) bool) string {
-	const prefix = "javascript-api/"
+	prefix := jsAPISlug + "/"
 	if !strings.HasPrefix(slug, prefix) {
 		return slug
 	}

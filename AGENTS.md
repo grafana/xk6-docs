@@ -14,6 +14,11 @@
 - `k6 x docs best-practices` prints a curated guide (embedded in the prepare tool via `//go:embed`).
 - `k6 x docs search <query>` fuzzy searches (case-insensitive, ignores punctuation, spaces, slashes) and prints an indented tree: `- {group}` with `  - {child}` underneath, no descriptions. Footer shows `Example:` with a sample navigation command. Search uses the same arg normalization and resolve rules as docs navigation (shared `normalizeArgs` and `ResolveWithLookup`), so `search browser page`, `search browser/page`, and `search javascript-api browser page` all produce the same results. `--depth` flag controls tree depth (same as TOC/section footers).
 
+## Shell completions
+- `ValidArgsFunction` on the `docs` and `search` commands provides dynamic topic completion via cobra's `__complete` mechanism. Users set up completions once via k6's built-in `k6 completion zsh` (or bash/fish/powershell); extensions like xk6-docs piggyback on that.
+- First-arg completions include categories, JS API module shortcuts, and `best-practices`. Deeper args complete children of the resolved slug.
+- Completions require cached docs — if the cache doesn't exist, no completions are returned (no network I/O). Users must run `k6 x docs` once to trigger the initial download.
+
 ## Slug resolution
 - Categories are derived from the bundle's `sections.json` at runtime — no hardcoded category list in the binary. If the first arg (or its first segment) exists as a slug in the index, it's used directly. Otherwise, it's treated as a JS API module shorthand.
 - Args are normalized first: slashes are split so `mod/child` is treated identically to `mod child`.

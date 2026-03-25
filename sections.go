@@ -10,6 +10,8 @@ import (
 	"go.k6.io/k6/lib/fsext"
 )
 
+const jsAPISlug = "javascript-api"
+
 // Section represents a single documentation section.
 type Section struct {
 	Slug        string   `json:"slug"`
