@@ -1,4 +1,4 @@
-k6-docs --cache-dir $WORK/cache --version v0.55.x best-practices
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x best-practices
 cmp stdout golden.txt
 ! stdout '---'
 

@@ -1,0 +1,53 @@
+# Dark terminal (default PTY): glamour auto-selects dark style (38;5;252 = light gray text).
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a fn-one
+stdout '38;5;252'
+stdout 'modA.fnOne'
+
+# Light terminal (COLORFGBG=0;15): glamour auto-selects light style (38;5;234 = dark gray text).
+env COLORFGBG=0;15
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a fn-one
+stdout '38;5;234'
+stdout 'modA.fnOne'
+env COLORFGBG=
+
+# NO_COLOR env var on TTY: raw markdown, not glamour-rendered.
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a fn-one
+stdout '## modA.fnOne'
+env NO_COLOR=
+
+# --no-color CLI flag on TTY: raw markdown, not glamour-rendered.
+ptyexec ./k6 --no-color x docs --cache-dir $WORK/cache --version v0.55.x mod-a fn-one
+stdout '## modA.fnOne'
+
+# Pager pipes rendered output through PAGER=cat.
+env PAGER=cat
+exec ./k6 x docs -p --cache-dir $WORK/cache --version v0.55.x mod-a fn-one
+stdout '\x1b\['
+stdout 'modA.fnOne'
+env PAGER=
+
+# Default pager is "less -r" — verified via a fake less that logs its args.
+mkdir $WORK/bin
+cp fake-less.sh $WORK/bin/less
+chmod 0755 $WORK/bin/less
+env PATH=$WORK/bin:$PATH
+env PAGER=
+exec ./k6 x docs -p --cache-dir $WORK/cache --version v0.55.x mod-a fn-one
+stdout 'modA.fnOne'
+grep '^-r$' $WORK/less.args
+
+# Width: default auto-detects from PTY; narrow wraps tighter than default and wide.
+ptyexec ./k6 x docs -w 40 --cache-dir $WORK/cache --version v0.55.x showcase
+cp stdout narrow.txt
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x showcase
+cp stdout default.txt
+ptyexec ./k6 x docs -w 120 --cache-dir $WORK/cache --version v0.55.x showcase
+cp stdout wide.txt
+linecountgt narrow.txt default.txt
+linecountgt narrow.txt wide.txt
+
+-- fake-less.sh --
+#!/bin/sh
+printf '%s\n' "$@" > "$WORK/less.args"
+cat

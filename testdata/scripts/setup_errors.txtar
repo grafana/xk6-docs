@@ -1,6 +1,51 @@
 # Bad sections.json → load index error
-! k6-docs --cache-dir $WORK/bad-cache --version v0.55.x
+! exec ./k6 x docs --cache-dir $WORK/bad-cache --version v0.55.x
 stderr 'load index'
+
+# Missing cache directory → load index error
+! exec ./k6 x docs --cache-dir $WORK/nonexistent --version v0.55.x
+stderr 'load index'
+
+# Ghost child slug in sections.json → parent renders without crashing
+exec ./k6 x docs --cache-dir $WORK/ghost-cache --version v0.55.x ghost-parent
+stdout '- real-child'
+! stdout 'missing-child'
 
 -- bad-cache/sections.json --
 {bad json
+-- ghost-cache/sections.json --
+{
+  "version": "v0.55.x",
+  "sections": [
+    {
+      "slug": "ghost-parent",
+      "rel_path": "ghost-parent/_index.md",
+      "title": "GhostParent",
+      "description": "Parent with a ghost child.",
+      "weight": 1,
+      "category": "ghost-parent",
+      "children": ["ghost-parent/real-child", "ghost-parent/missing-child"],
+      "is_index": true
+    },
+    {
+      "slug": "ghost-parent/real-child",
+      "rel_path": "ghost-parent/real-child.md",
+      "title": "RealChild",
+      "description": "Exists in index.",
+      "weight": 1,
+      "category": "ghost-parent",
+      "children": null,
+      "is_index": false
+    }
+  ]
+}
+-- ghost-cache/markdown/ghost-parent/_index.md --
+---
+title: 'GhostParent'
+---
+# GhostParent
+-- ghost-cache/markdown/ghost-parent/real-child.md --
+---
+title: 'RealChild'
+---
+# RealChild

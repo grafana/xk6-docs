@@ -1,24 +1,24 @@
 # Section with children shows subtopics footer
-k6-docs --cache-dir $WORK/cache --version v0.55.x mod-a
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a
 cmp stdout golden-mod-a.txt
 
 # Leaf section: no subtopics footer, frontmatter stripped
-k6-docs --cache-dir $WORK/cache --version v0.55.x mod-a fn-one
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a fn-one
 cmp stdout golden-mod-a-fn-one.txt
 ! stdout '---'
 ! stdout 'title:'
 
 # Child names strip parent prefix (child-a-clear -> clear)
-k6-docs --cache-dir $WORK/cache --version v0.55.x mod-a child-a
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a child-a
 stdout '- clear'
 
 # Non-JS-API usage hint with slug path
-k6-docs --cache-dir $WORK/cache --version v0.55.x alpha
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x alpha
 stdout 'k6 x docs alpha/'
 
 # Missing markdown file: section appears blank (no error shown to user).
 rm $WORK/cache/markdown/gamma/_index.md
-k6-docs --cache-dir $WORK/cache --version v0.55.x gamma
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x gamma
 ! stderr 'error'
 ! stderr 'not found'
 

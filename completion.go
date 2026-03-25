@@ -101,14 +101,16 @@ func completionFirstArg(idx *Index, toComplete string) []cobra.Completion {
 
 	jsAPI, ok := idx.Lookup(jsAPISlug)
 	if ok {
+		seen := make(map[string]bool)
 		for _, childSlug := range jsAPI.Children {
 			if _, ok := idx.Lookup(childSlug); !ok {
 				continue
 			}
 			short := strings.TrimPrefix(childName(childSlug, jsAPISlug), "k6-")
-			if topLevel[short] {
+			if topLevel[short] || seen[short] {
 				continue
 			}
+			seen[short] = true
 			if !strings.HasPrefix(strings.ToLower(short), prefix) {
 				continue
 			}

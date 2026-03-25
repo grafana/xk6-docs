@@ -1,8 +1,12 @@
-# Non-TTY logs agent mode to stderr (main command only)
-k6-docs --cache-dir $WORK/cache --version v0.55.x
+# Non-TTY logs agent mode to stderr (needs --verbose for debug-level logs)
+exec ./k6 --verbose x docs --cache-dir $WORK/cache --version v0.55.x
 stderr 'agent mode'
 
+# TTY logs interactive mode.
+ptyexec ./k6 --verbose x docs --cache-dir $WORK/cache --version v0.55.x
+stderr 'interactive mode'
+
 # Search does NOT emit mode debug log
-k6-docs --cache-dir $WORK/cache --version v0.55.x search k6
+exec ./k6 --verbose x docs --cache-dir $WORK/cache --version v0.55.x search k6
 ! stderr 'agent mode'
 ! stderr 'interactive mode'

@@ -1,0 +1,68 @@
+# Test shell completion for topic args.
+# Completion goes through k6's root __complete, which delegates to the docs command.
+
+env K6_DOCS_CACHE_DIR=$WORK/cache
+env K6_DOCS_VERSION=v0.55.x
+
+# Zero args: returns all top-level categories, JS API children, and best-practices.
+exec ./k6 __complete x docs ''
+stdout 'javascript-api'
+stdout 'alpha'
+stdout 'beta'
+stdout 'mod-a'
+stdout 'mod-b'
+stdout 'lib-c'
+stdout 'best-practices'
+stdout ':4'
+
+# First-arg: lib-c appears once (deduped from lib-c + k6-lib-c).
+cp stdout first-completions.txt
+grep -count=1 'lib-c' first-completions.txt
+
+# Prefix filtering is case-insensitive.
+exec ./k6 __complete x docs Mo
+stdout 'mod-a'
+stdout 'mod-b'
+! stdout 'alpha'
+! stdout 'beta'
+
+# Prefix "al" returns alpha only.
+exec ./k6 __complete x docs al
+stdout 'alpha'
+! stdout 'beta'
+
+# One arg resolves children. fn-one appears exactly once (deduped from fn-one + k6-mod-a-fn-one).
+exec ./k6 __complete x docs mod-a ''
+cp stdout completions.txt
+grep -count=1 'fn-one' completions.txt
+stdout 'fn-two'
+stdout 'child-a'
+
+# One arg with prefix filters children.
+exec ./k6 __complete x docs mod-a f
+stdout 'fn-one'
+stdout 'fn-two'
+! stdout 'child-a'
+
+# Category children.
+exec ./k6 __complete x docs alpha ''
+stdout 'topic-one'
+
+# Two args resolve deeper children.
+exec ./k6 __complete x docs mod-a child-a ''
+stdout 'clear'
+
+# Unresolvable args return no completions (only directive line).
+exec ./k6 __complete x docs nonexistent-topic-xyz ''
+! stdout 'mod-a'
+! stdout 'alpha'
+stdout ':4'
+
+# Bad cache → nil index → no completions.
+env K6_DOCS_CACHE_DIR=$WORK/bad-cache
+exec ./k6 __complete x docs ''
+! stdout 'javascript-api'
+stdout ':4'
+
+-- bad-cache/sections.json --
+{bad json

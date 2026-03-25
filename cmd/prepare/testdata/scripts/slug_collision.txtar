@@ -1,0 +1,40 @@
+# When a leaf file and _index.md produce the same slug, _index.md wins.
+exec ./prepare --k6-version v0.99.x --k6-docs-path $WORK/collision --output-dir $WORK/out
+grep '"title": "ChildA class"' $WORK/out/sections.json
+! grep '"title": "child-a function"' $WORK/out/sections.json
+
+-- collision/docs/sources/k6/v0.99.x/_index.md --
+---
+title: root
+---
+-- collision/docs/sources/k6/v0.99.x/javascript-api/_index.md --
+---
+title: 'JS API'
+weight: 1
+---
+-- collision/docs/sources/k6/v0.99.x/javascript-api/k6-mod-a/_index.md --
+---
+title: 'k6/mod-a'
+weight: 1
+---
+-- collision/docs/sources/k6/v0.99.x/javascript-api/k6-mod-a/child-a.md --
+---
+title: 'child-a function'
+weight: 10
+---
+
+A function.
+-- collision/docs/sources/k6/v0.99.x/javascript-api/k6-mod-a/child-a/_index.md --
+---
+title: 'ChildA class'
+weight: 20
+---
+
+A class with children.
+-- collision/docs/sources/k6/v0.99.x/javascript-api/k6-mod-a/child-a/set.md --
+---
+title: 'set'
+weight: 1
+---
+
+Set an item.

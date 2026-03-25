@@ -1,0 +1,23 @@
+# Auto-clone from local git repo when no k6-docs-path given.
+gitinit $WORK/localrepo
+mkdir $WORK/localrepo/docs/sources/k6/v0.99.x
+cp mini-index.md $WORK/localrepo/docs/sources/k6/v0.99.x/_index.md
+mkdir $WORK/localrepo/docs/sources/k6/v0.99.x/example
+cp mini-section.md $WORK/localrepo/docs/sources/k6/v0.99.x/example/_index.md
+exec git -C $WORK/localrepo add .
+exec git -C $WORK/localrepo -c user.name=test -c user.email=test@test -c commit.gpgsign=false commit -m 'add docs'
+
+exec ./prepare --k6-version v0.99.x --k6-docs-path $WORK/localrepo --output-dir $WORK/out
+exists $WORK/out/sections.json
+grep 'example' $WORK/out/sections.json
+
+-- mini-index.md --
+---
+title: 'Docs'
+---
+-- mini-section.md --
+---
+title: 'Example'
+weight: 1
+---
+# Example

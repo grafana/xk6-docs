@@ -200,6 +200,16 @@
       "category": "zeta",
       "children": null,
       "is_index": true
+    },
+    {
+      "slug": "showcase",
+      "rel_path": "showcase/_index.md",
+      "title": "Showcase",
+      "description": "Transform showcase.",
+      "weight": 99,
+      "category": "showcase",
+      "children": null,
+      "is_index": true
     }
   ]
 }

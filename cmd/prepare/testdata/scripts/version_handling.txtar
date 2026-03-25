@@ -1,0 +1,11 @@
+# Exact version maps to wildcard directory but preserves original in output.
+exec ./prepare --k6-version v0.99.3 --k6-docs-path $WORK/mockdocs --output-dir $WORK/exact
+grep '"version": "v0.99.3"' $WORK/exact/sections.json
+
+# No-v-prefix version also maps correctly.
+exec ./prepare --k6-version 0.99.3 --k6-docs-path $WORK/mockdocs --output-dir $WORK/novprefix
+grep '"version": "0.99.3"' $WORK/novprefix/sections.json
+
+# Missing version directory → error.
+! exec ./prepare --k6-version v999.999.x --k6-docs-path $WORK/mockdocs --output-dir $WORK/missing
+stderr 'version root not found'

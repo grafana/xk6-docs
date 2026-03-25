@@ -33,14 +33,24 @@ const (
 // to see if a newer doc bundle is available.
 const stalenessCheckInterval = 24 * time.Hour
 
-// refreshTimeout caps how long a staleness HEAD or refresh GET can take.
+// defaultRefreshTimeout caps how long a staleness HEAD or refresh GET can take.
 // Keeps the offline-first experience fast when the network is slow.
-const refreshTimeout = 10 * time.Second
+// Override via K6_DOCS_REFRESH_TIMEOUT env var (parsed as time.Duration).
+const defaultRefreshTimeout = 10 * time.Second
 
 const (
 	etagFile      = ".etag"
 	lastCheckFile = ".last_check"
 )
+
+func resolveRefreshTimeout(env map[string]string) time.Duration {
+	if s := env["K6_DOCS_REFRESH_TIMEOUT"]; s != "" {
+		if d, err := time.ParseDuration(s); err == nil && d > 0 {
+			return d
+		}
+	}
+	return defaultRefreshTimeout
+}
 
 // CacheDir returns the local cache directory for a given docs version.
 // The layout is ~/.local/share/k6/docs/{version}/.
@@ -76,17 +86,24 @@ func EnsureDocs(
 		return "", err
 	}
 
+	url := bundleURL(env, version)
+
 	info, statErr := afs.Stat(filepath.Clean(dir))
 	if statErr == nil && info.IsDir() {
-		if checkStaleness(ctx, afs, dir, version, httpClient) {
-			if err := refreshCache(ctx, afs, dir, version, httpClient); err != nil {
+		// Staleness refresh is best-effort with a timeout — if it fails
+		// or takes too long, the stale cache is served silently.
+		refreshCtx, cancel := context.WithTimeout(ctx, resolveRefreshTimeout(env))
+		defer cancel()
+
+		if checkStaleness(refreshCtx, afs, dir, url, httpClient) {
+			if err := refreshCache(refreshCtx, afs, dir, version, url, httpClient); err != nil {
 				return "", fmt.Errorf("refresh docs %s: %w", version, err)
 			}
 		}
 		return dir, nil
 	}
 
-	body, etag, err := fetchBundle(ctx, httpClient, version)
+	body, etag, err := fetchBundle(ctx, httpClient, version, url)
 	if err != nil {
 		return "", err
 	}
@@ -97,14 +114,10 @@ func EnsureDocs(
 // On fetch failure the old cache is preserved (returns nil).
 // On install failure the broken dir is cleaned up and the error is returned
 // so the caller can report it instead of serving a missing cache.
-func refreshCache(ctx context.Context, afs fsext.Fs, dir, version string, httpClient *http.Client) error {
-	ctx, cancel := context.WithTimeout(ctx, refreshTimeout)
-	defer cancel()
-
-	body, etag, err := fetchBundle(ctx, httpClient, version)
+func refreshCache(ctx context.Context, afs fsext.Fs, dir, version, url string, httpClient *http.Client) error {
+	body, etag, err := fetchBundle(ctx, httpClient, version, url)
 	if err != nil {
-		// Network/HTTP/timeout failure — keep serving stale cache.
-		return nil
+		return nil //nolint:nilerr // intentional: fetch failure preserves stale cache
 	}
 	_ = afs.RemoveAll(dir)
 	return installBundle(afs, dir, version, body, etag)
@@ -114,8 +127,8 @@ func refreshCache(ctx context.Context, afs fsext.Fs, dir, version string, httpCl
 // Bundles are small (compressed docs), so the memory cost is acceptable.
 // Buffering ensures the download is complete before the caller modifies
 // any cache state.
-func fetchBundle(ctx context.Context, httpClient *http.Client, version string) ([]byte, string, error) {
-	resp, err := doRequest(ctx, httpClient, http.MethodGet, downloadURL(version))
+func fetchBundle(ctx context.Context, httpClient *http.Client, version, url string) ([]byte, string, error) {
+	resp, err := doRequest(ctx, httpClient, http.MethodGet, url)
 	if err != nil {
 		return nil, "", fmt.Errorf("download docs %s: %w", version, err)
 	}
@@ -162,15 +175,12 @@ func installBundle(afs fsext.Fs, dir, version string, body []byte, etag string) 
 // Metadata parse errors are treated as stale so a corrupt .last_check
 // or .etag self-heals on the next run instead of hard-failing.
 // Network errors fall back to the cached copy silently.
-func checkStaleness(ctx context.Context, afs fsext.Fs, dir, version string, httpClient *http.Client) bool {
+func checkStaleness(ctx context.Context, afs fsext.Fs, dir, url string, httpClient *http.Client) bool {
 	if !isStale(afs, dir) {
 		return false
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, refreshTimeout)
-	defer cancel()
-
-	resp, err := doRequest(ctx, httpClient, http.MethodHead, downloadURL(version))
+	resp, err := doRequest(ctx, httpClient, http.MethodHead, url)
 	if err != nil {
 		return false
 	}
@@ -283,12 +293,15 @@ func doRequest(ctx context.Context, client *http.Client, method, reqURL string) 
 	if err != nil {
 		return nil, err
 	}
-	return client.Do(req) //nolint:gosec // URL built by downloadURL with validated version.
+	return client.Do(req) //nolint:gosec // URL built by bundleURL with validated version.
 }
 
-// downloadURL returns the release URL for a given docs version.
-// The version must be a safe path segment (e.g. "v1.6.x").
-func downloadURL(version string) string {
+// bundleURL returns the download URL for a docs bundle.
+// K6_DOCS_BUNDLE_URL overrides the default GitHub release URL.
+func bundleURL(env map[string]string, version string) string {
+	if override := env["K6_DOCS_BUNDLE_URL"]; override != "" {
+		return override
+	}
 	const base = "https://github.com/grafana/xk6-docs/releases/download"
 	return base + "/doc-bundles/docs-" + version + ".tar.zst"
 }

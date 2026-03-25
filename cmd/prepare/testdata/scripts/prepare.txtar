@@ -1,0 +1,64 @@
+# Prepare mock docs and verify output structure.
+exec ./prepare --k6-version v0.99.x --k6-docs-path $WORK/mockdocs --output-dir $WORK/out
+
+# sections.json exists with correct version.
+exists $WORK/out/sections.json
+grep '"version": "v0.99.x"' $WORK/out/sections.json
+
+# Expected slugs present.
+grep 'javascript-api' $WORK/out/sections.json
+grep 'javascript-api/k6-mod-a' $WORK/out/sections.json
+grep 'javascript-api/k6-mod-a/fn-one' $WORK/out/sections.json
+grep 'javascript-api/k6-mod-a/fn-two' $WORK/out/sections.json
+grep 'alpha' $WORK/out/sections.json
+grep 'alpha/topic-two' $WORK/out/sections.json
+grep 'alpha/topic-three' $WORK/out/sections.json
+
+# Shared content excluded as a category.
+! grep '"category": "shared"' $WORK/out/sections.json
+
+# Children populated: k6-mod-a has fn-one and fn-two.
+grep 'javascript-api/k6-mod-a/fn-one' $WORK/out/sections.json
+grep 'javascript-api/k6-mod-a/fn-two' $WORK/out/sections.json
+
+# Metadata: javascript-api has correct weight.
+grep '"title": "JavaScript API"' $WORK/out/sections.json
+
+# Shared content resolved in markdown output (docs/shared shortcode removed).
+exists $WORK/out/markdown/javascript-api/k6-mod-a/_index.md
+! grep 'docs/shared' $WORK/out/markdown/javascript-api/k6-mod-a/_index.md
+grep 'k6/mod-a module contains functionality' $WORK/out/markdown/javascript-api/k6-mod-a/_index.md
+
+# Code tags preserved in bundle (stripped at runtime).
+exists $WORK/out/markdown/javascript-api/k6-mod-a/fn-one.md
+grep 'code' $WORK/out/markdown/javascript-api/k6-mod-a/fn-one.md
+grep 'import modA' $WORK/out/markdown/javascript-api/k6-mod-a/fn-one.md
+
+# Admonition preserved in bundle (converted at runtime).
+exists $WORK/out/markdown/alpha/topic-two.md
+grep 'admonition' $WORK/out/markdown/alpha/topic-two.md
+
+# Frontmatter preserved in bundle (stripped at runtime).
+exists $WORK/out/markdown/alpha/topic-three.md
+grep 'TopicThree' $WORK/out/markdown/alpha/topic-three.md
+
+# Version placeholder preserved in bundle (replaced at runtime).
+grep 'K6_VERSION' $WORK/out/markdown/javascript-api/k6-mod-a/fn-one.md
+
+# Children populated: k6-mod-a children include fn-one and fn-two.
+grep 'javascript-api/k6-mod-a/fn-one' $WORK/out/sections.json
+grep 'javascript-api/k6-mod-a/fn-two' $WORK/out/sections.json
+
+# Alpha children: both topic-two and topic-three present.
+grep 'alpha/topic-two' $WORK/out/sections.json
+grep 'alpha/topic-three' $WORK/out/sections.json
+
+# Duplicate YAML keys handled: first description kept, no error.
+grep 'TopicTwo items validate' $WORK/out/sections.json
+! grep 'Duplicate description' $WORK/out/sections.json
+
+# best_practices.md written to output.
+exists $WORK/out/best_practices.md
+grep 'Test Structure' $WORK/out/best_practices.md
+grep 'Performance' $WORK/out/best_practices.md
+grep 'Error Handling' $WORK/out/best_practices.md

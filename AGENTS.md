@@ -1,8 +1,12 @@
 ## RULES
 1. Update this file concisely whenever features are added, removed, or changed.
-2. Always use TDD (red/green/refactor). Tests must compile and fail on assertions before writing implementation.
-3. Never skip linters (`//nolint` without proof), trick the linter, change `go.mod` k6 floor below v1.5.0, add global vars or `init()` (except `register.go`).
-4. Plans: When writing complex features or significant refactors, use a Plan (as described in `.claude/PLANS.md`) from design to implementation. Store plans in `.claude/plans/` with incrementing numbers.
+2. Update the `features.md` file when user-facing features are added, removed, or changed.
+4. Never take easy shortcuts or chase after easy wins. Execute what's asked for.
+5. Make the minimal change that delivers the new feature or fixes the bug.
+3. Use TDD: write a minimal test, fail it, write a minimal code to pass it. Repeat.
+6. User facing features should be tested with test scripts in `testdata/scripts`.
+7. Never skip linters (`//nolint` without proof), trick the linter, change `go.mod` k6 floor below v1.5.0, add global vars or `init()` (except `register.go`).
+8. Plans: When writing complex features or significant refactors, use a Plan (as described in `.claude/PLANS.md`) from design to implementation. Store plans in `.claude/plans/` with incrementing numbers.
 
 ---
 

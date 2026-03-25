@@ -1,40 +1,40 @@
 # --version flag overrides K6_DOCS_VERSION env
 env K6_DOCS_VERSION=v9.9.x
-k6-docs --cache-dir $WORK/cache --version v0.55.x
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x
 stdout '# k6 v0\.55\.x'
 
 # K6_DOCS_VERSION env used when no --version flag
 env K6_DOCS_VERSION=v0.55.x
 env K6_DOCS_CACHE_DIR=
-k6-docs --cache-dir $WORK/cache
+exec ./k6 x docs --cache-dir $WORK/cache
 stdout '# k6 v0\.55\.x'
 
 # K6_DOCS_CACHE_DIR env used when no --cache-dir flag
 env K6_DOCS_VERSION=
 env K6_DOCS_CACHE_DIR=$WORK/cache
-k6-docs --version v0.55.x
+exec ./k6 x docs --version v0.55.x
 stdout '# k6 v0\.55\.x'
 
 # --cache-dir flag overrides K6_DOCS_CACHE_DIR env
 env K6_DOCS_VERSION=
 env K6_DOCS_CACHE_DIR=/nonexistent/path
-k6-docs --cache-dir $WORK/cache --version v0.55.x
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x
 stdout '# k6 v0\.55\.x'
 
 # --version maps exact version to wildcard
 env K6_DOCS_VERSION=
 env K6_DOCS_CACHE_DIR=
-k6-docs --cache-dir $WORK/cache --version v0.55.2
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.2
 stdout '# k6 v0\.55\.x'
 
 # K6_DOCS_VERSION env also maps to wildcard
 env K6_DOCS_VERSION=v0.55.2
 env K6_DOCS_CACHE_DIR=
-k6-docs --cache-dir $WORK/cache
+exec ./k6 x docs --cache-dir $WORK/cache
 stdout '# k6 v0\.55\.x'
 
 # --version without v prefix maps to wildcard with v prefix
 env K6_DOCS_VERSION=
 env K6_DOCS_CACHE_DIR=
-k6-docs --cache-dir $WORK/cache --version 1.6.0
+exec ./k6 x docs --cache-dir $WORK/cache --version 1.6.0
 stdout '# k6 v1\.6\.x'

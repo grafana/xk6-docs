@@ -1,19 +1,56 @@
 package docs
 
 import (
+	"archive/tar"
+	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/creack/pty"
+	"github.com/klauspost/compress/zstd"
 	"github.com/rogpeppe/go-internal/testscript"
-	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/lib/fsext"
 )
+
+// testBinary is the path to the real k6 binary built from cmd/testk6.
+// Set by TestMain before any tests run.
+var testBinary string //nolint:gochecknoglobals
+
+func TestMain(m *testing.M) {
+	testBinary = buildTestBinary()
+	os.Exit(m.Run())
+}
+
+// buildTestBinary builds cmd/testk6 once and caches the result under the
+// Go build cache directory. Subsequent runs reuse the cached binary if
+// the source hasn't changed (checked via go build's own staleness logic).
+func buildTestBinary() string {
+	cacheDir, err := os.UserCacheDir()
+	if err != nil {
+		log.Fatalf("cache dir: %v", err)
+	}
+	dir := filepath.Join(cacheDir, "xk6-docs-test")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		log.Fatalf("mkdir: %v", err)
+	}
+
+	bin := filepath.Join(dir, "k6")
+	build := exec.CommandContext(context.Background(), "go", "build", "-o", bin, "./cmd/testk6")
+	out, err := build.CombinedOutput()
+	if err != nil {
+		log.Fatalf("build testk6: %v\n%s", err, out)
+	}
+	return bin
+}
 
 func TestScripts(t *testing.T) {
 	t.Parallel()
@@ -21,45 +58,399 @@ func TestScripts(t *testing.T) {
 	testscript.Run(t, testscript.Params{
 		Dir: "testdata/scripts",
 		Setup: func(env *testscript.Env) error {
+			if err := os.Symlink(testBinary, filepath.Join(env.WorkDir, "k6")); err != nil {
+				return err
+			}
 			return copyDir("testdata/cache", filepath.Join(env.WorkDir, "cache"))
 		},
 		Cmds: map[string]func(ts *testscript.TestScript, neg bool, args []string){
-			"k6-docs": runK6DocsCmd,
+			"ptyexec":            runPtyExec,
+			"linecountgt":        runLinecountGt,
+			"cpdir":              runCpdir,
+			"bundlesrv":          runBundleSrv,
+			"backdate-lastcheck": runBackdateLastcheck,
+			"checkperm":          runCheckPerm,
+			"mkzeroes":           runMkZeroes,
+			"containslines":      runContainsLines,
 		},
 		UpdateScripts: os.Getenv("UPDATE_GOLDEN") != "",
 	})
 }
 
-// runK6DocsCmd runs the docs command in-process for testscript, avoiding
-// subprocess overhead. It injects the testscript's sandboxed environment
-// into the GlobalState so env directives in txtar scripts work correctly.
-func runK6DocsCmd(ts *testscript.TestScript, neg bool, args []string) {
-	gs := state.NewGlobalState(context.Background())
-	gs.Logger.SetLevel(logrus.DebugLevel)
-	gs.Logger.SetOutput(ts.Stderr())
-	gs.Env = map[string]string{
-		"K6_DOCS_VERSION":   ts.Getenv("K6_DOCS_VERSION"),
-		"K6_DOCS_CACHE_DIR": ts.Getenv("K6_DOCS_CACHE_DIR"),
-		"HOME":              ts.Getenv("HOME"),
-		"USERPROFILE":       ts.Getenv("USERPROFILE"),
+// runPtyExec runs a command with stdout attached to a PTY so the subprocess
+// sees a real terminal (isatty returns true). Stderr is captured separately.
+// Usage: ptyexec <prog> <args...>
+func runPtyExec(ts *testscript.TestScript, neg bool, args []string) {
+	if len(args) < 1 {
+		ts.Fatalf("usage: ptyexec <prog> <args...>")
 	}
 
-	cmd := newCmd(gs)
-	cmd.SetOut(ts.Stdout())
-	cmd.SetErr(ts.Stderr())
-	cmd.SetArgs(args)
+	prog := ts.MkAbs(args[0])
+	cmd := exec.CommandContext(context.Background(), prog, args[1:]...)
+	cmd.Env = ptyEnv(ts)
+	cmd.Dir = ts.Getenv("WORK")
 
-	err := cmd.Execute()
+	// Create PTY for stdout — makes isatty(stdout) true in the subprocess.
+	ptmx, tty, err := pty.Open()
 	if err != nil {
-		_, _ = fmt.Fprintf(ts.Stderr(), "Error: %v\n", err)
+		ts.Fatalf("pty.Open: %v", err)
 	}
+	defer func() { _ = ptmx.Close() }()
+
+	cmd.Stdout = tty
+	cmd.Stdin = tty
+
+	// Capture stderr separately via pipe so testscript stderr assertions work.
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		_ = tty.Close()
+		ts.Fatalf("stderr pipe: %v", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		_ = tty.Close()
+		ts.Fatalf("start: %v", err)
+	}
+	_ = tty.Close()
+
+	// Read PTY master until slave closes (process exits).
+	var stdoutBuf bytes.Buffer
+	_, _ = io.Copy(&stdoutBuf, ptmx) // EIO on slave close is expected
+
+	stderrBytes, _ := io.ReadAll(stderrPipe)
+
+	waitErr := cmd.Wait()
+
+	_, _ = ts.Stdout().Write(stdoutBuf.Bytes())
+	_, _ = ts.Stderr().Write(stderrBytes)
+
 	if neg {
-		if err == nil {
+		if waitErr == nil {
 			ts.Fatalf("expected command to fail")
 		}
-	} else if err != nil {
-		ts.Fatalf("unexpected command failure")
+	} else if waitErr != nil {
+		ts.Fatalf("command failed: %v", waitErr)
 	}
+}
+
+// ptyEnv builds a clean environment for ptyexec subprocesses.
+// It pulls known vars from the testscript env and sets TERM for TTY detection.
+// Host NO_COLOR is excluded unless the script explicitly sets it.
+func ptyEnv(ts *testscript.TestScript) []string {
+	env := []string{
+		"PATH=" + ts.Getenv("PATH"),
+		"HOME=" + ts.Getenv("HOME"),
+		"TMPDIR=" + ts.Getenv("TMPDIR"),
+		"TERM=xterm-256color",
+	}
+	for _, key := range []string{
+		"K6_DOCS_VERSION", "K6_DOCS_CACHE_DIR", "K6_DOCS_BUNDLE_URL",
+		"USERPROFILE", "PAGER", "NO_COLOR", "K6_NO_COLOR", "COLORFGBG",
+	} {
+		if v := ts.Getenv(key); v != "" {
+			env = append(env, key+"="+v)
+		}
+	}
+	return env
+}
+
+// runLinecountGt asserts that the first file has strictly more lines than the second.
+// Usage: linecountgt <file-a> <file-b>
+func runLinecountGt(ts *testscript.TestScript, neg bool, args []string) {
+	if len(args) != 2 {
+		ts.Fatalf("usage: linecountgt <file-a> <file-b>")
+	}
+
+	count := func(name string) int {
+		data, err := os.ReadFile(ts.MkAbs(name))
+		if err != nil {
+			ts.Fatalf("read %s: %v", name, err)
+		}
+		n := 0
+		for _, b := range data {
+			if b == '\n' {
+				n++
+			}
+		}
+		return n
+	}
+
+	a, b := count(args[0]), count(args[1])
+	if neg {
+		if a > b {
+			ts.Fatalf("%s (%d lines) > %s (%d lines), expected not greater", args[0], a, args[1], b)
+		}
+	} else {
+		if a <= b {
+			ts.Fatalf("%s (%d lines) <= %s (%d lines), expected greater", args[0], a, args[1], b)
+		}
+	}
+}
+
+// runCpdir recursively copies a directory tree.
+// Usage: cpdir <src> <dst>
+func runCpdir(ts *testscript.TestScript, _ bool, args []string) {
+	if len(args) != 2 {
+		ts.Fatalf("usage: cpdir <src> <dst>")
+	}
+	if err := copyDir(ts.MkAbs(args[0]), ts.MkAbs(args[1])); err != nil {
+		ts.Fatalf("cpdir: %v", err)
+	}
+}
+
+// runBundleSrv starts a mock HTTP server that serves tar.zst bundles built
+// from files in <dir>. Behavior is controlled via files in $WORK:
+//   - .bundlesrv-etag: ETag header value (default: "v1")
+//   - .bundlesrv-status: HTTP status code to return (overrides bundle serving)
+//   - .bundlesrv-badpath: if present, inject a "../escape.txt" entry
+//   - .bundlesrv-symlink: if present, inject a symlink entry
+//   - .bundlesrv-oversize: if present, inject a 51MB file entry
+//   - .bundlesrv-slow: if present, block on HEAD/GET until request cancelled
+//   - .bundlesrv-raw-file: if present, serve this file's path as raw response body
+//
+// Sets K6_DOCS_BUNDLE_URL env var to the server URL.
+// Usage: bundlesrv <dir>
+func runBundleSrv(ts *testscript.TestScript, _ bool, args []string) {
+	if len(args) < 1 {
+		ts.Fatalf("usage: bundlesrv <dir>")
+	}
+	bundleDir := ts.MkAbs(args[0])
+	workDir := ts.Getenv("WORK")
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, err := os.Stat(filepath.Join(workDir, ".bundlesrv-slow")); err == nil {
+			<-r.Context().Done()
+			return
+		}
+
+		if _, err := os.Stat(filepath.Join(workDir, ".bundlesrv-raw-file")); err == nil {
+			f, err := os.Open(filepath.Join(workDir, ".bundlesrv-raw-body"))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			defer func() { _ = f.Close() }()
+			w.Header().Set("ETag", `"v1"`)
+			_, _ = io.Copy(w, f)
+			return
+		}
+
+		if data, err := os.ReadFile(filepath.Join(workDir, ".bundlesrv-status")); err == nil {
+			code, _ := strconv.Atoi(strings.TrimSpace(string(data)))
+			if code > 0 {
+				http.Error(w, "error", code)
+				return
+			}
+		}
+
+		etag := `"v1"`
+		if data, err := os.ReadFile(filepath.Join(workDir, ".bundlesrv-etag")); err == nil {
+			etag = strings.TrimSpace(string(data))
+		}
+		w.Header().Set("ETag", etag)
+
+		if r.Method == http.MethodHead {
+			return
+		}
+
+		var extras []tarEntry
+		if _, err := os.Stat(filepath.Join(workDir, ".bundlesrv-badpath")); err == nil {
+			extras = append(extras, tarEntry{name: "../escape.txt", content: []byte("evil")})
+		}
+		if _, err := os.Stat(filepath.Join(workDir, ".bundlesrv-symlink")); err == nil {
+			extras = append(extras, tarEntry{name: "link.txt", typeflag: tar.TypeSymlink})
+		}
+		if _, err := os.Stat(filepath.Join(workDir, ".bundlesrv-oversize")); err == nil {
+			extras = append(extras, tarEntry{name: "big.bin", oversizeBytes: 50<<20 + 1})
+		}
+
+		archive, err := buildTarZstFromDir(bundleDir, extras)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_, _ = w.Write(archive)
+	}))
+
+	ts.Setenv("K6_DOCS_BUNDLE_URL", srv.URL)
+}
+
+// runBackdateLastcheck writes a stale timestamp (25h ago) to <dir>/.last_check.
+// Usage: backdate-lastcheck <dir>
+func runBackdateLastcheck(ts *testscript.TestScript, _ bool, args []string) {
+	if len(args) != 1 {
+		ts.Fatalf("usage: backdate-lastcheck <dir>")
+	}
+	stale := time.Now().Add(-25 * time.Hour).Unix()
+	path := filepath.Join(ts.MkAbs(args[0]), ".last_check")
+	if err := os.WriteFile(path, []byte(strconv.FormatInt(stale, 10)), 0o640); err != nil {
+		ts.Fatalf("backdate: %v", err)
+	}
+}
+
+// runCheckPerm asserts that a file has the expected octal permission.
+// Usage: checkperm <octal> <file>
+func runCheckPerm(ts *testscript.TestScript, neg bool, args []string) {
+	if len(args) != 2 {
+		ts.Fatalf("usage: checkperm <octal> <file>")
+	}
+	want, err := strconv.ParseUint(args[0], 8, 32)
+	if err != nil {
+		ts.Fatalf("invalid octal %q: %v", args[0], err)
+	}
+	info, err := os.Stat(ts.MkAbs(args[1]))
+	if err != nil {
+		ts.Fatalf("stat %s: %v", args[1], err)
+	}
+	got := uint64(info.Mode().Perm())
+	if neg {
+		if got == want {
+			ts.Fatalf("%s has permission %04o, expected different", args[1], got)
+		}
+	} else {
+		if got != want {
+			ts.Fatalf("%s has permission %04o, want %04o", args[1], got, want)
+		}
+	}
+}
+
+// runMkZeroes creates a sparse file of the given size.
+// Usage: mkzeroes <size-bytes> <file>
+func runMkZeroes(ts *testscript.TestScript, _ bool, args []string) {
+	if len(args) != 2 {
+		ts.Fatalf("usage: mkzeroes <size-bytes> <file>")
+	}
+	size, err := strconv.ParseInt(args[0], 10, 64)
+	if err != nil {
+		ts.Fatalf("invalid size %q: %v", args[0], err)
+	}
+	f, err := os.Create(ts.MkAbs(args[1]))
+	if err != nil {
+		ts.Fatalf("create: %v", err)
+	}
+	if err := f.Truncate(size); err != nil {
+		_ = f.Close()
+		ts.Fatalf("truncate: %v", err)
+	}
+	_ = f.Close()
+}
+
+// runContainsLines asserts every non-empty line in <patterns-file> appears in <target-file>.
+// Usage: containslines <patterns-file> <target-file>
+func runContainsLines(ts *testscript.TestScript, neg bool, args []string) {
+	if len(args) != 2 {
+		ts.Fatalf("usage: containslines <patterns-file> <target-file>")
+	}
+	patterns, err := os.ReadFile(ts.MkAbs(args[0]))
+	if err != nil {
+		ts.Fatalf("read patterns: %v", err)
+	}
+	target, err := os.ReadFile(ts.MkAbs(args[1]))
+	if err != nil {
+		ts.Fatalf("read target: %v", err)
+	}
+	targetStr := string(target)
+	for line := range strings.SplitSeq(string(patterns), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		found := strings.Contains(targetStr, line)
+		if neg && found {
+			ts.Fatalf("unexpected match for %q in %s", line, args[1])
+		}
+		if !neg && !found {
+			ts.Fatalf("no match for %q in %s", line, args[1])
+		}
+	}
+}
+
+type tarEntry struct {
+	name          string
+	content       []byte
+	typeflag      byte
+	oversizeBytes int64
+}
+
+// buildTarZstFromDir walks a directory and builds a tar.zst archive from its files,
+// then appends any extra entries (bad paths, symlinks, oversized files).
+func buildTarZstFromDir(dir string, extras []tarEntry) ([]byte, error) {
+	var buf bytes.Buffer
+	zw, err := zstd.NewWriter(&buf)
+	if err != nil {
+		return nil, err
+	}
+	tw := tar.NewWriter(zw)
+
+	err = filepath.WalkDir(dir, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(dir, path)
+		if err != nil {
+			return err
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if err := tw.WriteHeader(&tar.Header{
+			Name: rel,
+			Mode: 0o644,
+			Size: int64(len(content)),
+		}); err != nil {
+			return err
+		}
+		_, err = tw.Write(content)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, e := range extras {
+		if err := writeExtraTarEntry(tw, e); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := tw.Close(); err != nil {
+		return nil, err
+	}
+	if err := zw.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func writeExtraTarEntry(tw *tar.Writer, e tarEntry) error {
+	if e.oversizeBytes > 0 {
+		if err := tw.WriteHeader(&tar.Header{Name: e.name, Mode: 0o644, Size: e.oversizeBytes}); err != nil {
+			return err
+		}
+		zeros := make([]byte, 32*1024)
+		for written := int64(0); written < e.oversizeBytes; {
+			n := min(e.oversizeBytes-written, int64(len(zeros)))
+			if _, err := tw.Write(zeros[:n]); err != nil {
+				return err
+			}
+			written += n
+		}
+		return nil
+	}
+	if err := tw.WriteHeader(&tar.Header{
+		Typeflag: e.typeflag,
+		Name:     e.name,
+		Mode:     0o644,
+		Size:     int64(len(e.content)),
+	}); err != nil {
+		return err
+	}
+	_, err := tw.Write(e.content)
+	return err
 }
 
 func copyDir(src, dst string) error {
@@ -81,366 +472,4 @@ func copyDir(src, dst string) error {
 		}
 		return os.WriteFile(target, content, 0o644)
 	})
-}
-
-func TestPrintTree(t *testing.T) {
-	t.Parallel()
-
-	sections := []Section{
-		{Slug: "alpha", Weight: 1, Category: "alpha", Children: []string{"alpha/child-1", "alpha/child-2"}},
-		{Slug: "alpha/child-1", Weight: 1, Category: "alpha", Children: []string{"alpha/child-1/grandchild"}},
-		{Slug: "alpha/child-1/grandchild", Weight: 1, Category: "alpha"},
-		{Slug: "alpha/child-2", Weight: 2, Category: "alpha"},
-		{Slug: "beta", Weight: 2, Category: "beta"},
-	}
-	idx := &Index{Sections: sections}
-	idx.bySlug = make(map[string]*Section, len(sections))
-	for i := range sections {
-		idx.bySlug[sections[i].Slug] = &sections[i]
-	}
-
-	items := idx.TopLevel()
-
-	t.Run("depth 1 prints flat list", func(t *testing.T) {
-		t.Parallel()
-		var buf strings.Builder
-		printTree(&buf, idx, items, "", "", 1)
-		want := "- alpha\n- beta\n"
-		if buf.String() != want {
-			t.Errorf("depth=1:\ngot:\n%s\nwant:\n%s", buf.String(), want)
-		}
-	})
-
-	t.Run("depth 2 prints one level of children", func(t *testing.T) {
-		t.Parallel()
-		var buf strings.Builder
-		printTree(&buf, idx, items, "", "", 2)
-		want := "- alpha\n  - child-1\n  - child-2\n- beta\n"
-		if buf.String() != want {
-			t.Errorf("depth=2:\ngot:\n%s\nwant:\n%s", buf.String(), want)
-		}
-	})
-
-	t.Run("depth 3 prints grandchildren", func(t *testing.T) {
-		t.Parallel()
-		var buf strings.Builder
-		printTree(&buf, idx, items, "", "", 3)
-		want := "- alpha\n  - child-1\n    - grandchild\n  - child-2\n- beta\n"
-		if buf.String() != want {
-			t.Errorf("depth=3:\ngot:\n%s\nwant:\n%s", buf.String(), want)
-		}
-	})
-
-	t.Run("depth 0 prints nothing", func(t *testing.T) {
-		t.Parallel()
-		var buf strings.Builder
-		printTree(&buf, idx, items, "", "", 0)
-		if buf.String() != "" {
-			t.Errorf("depth=0: got %q, want empty", buf.String())
-		}
-	})
-}
-
-func TestPrintSearchArgs(t *testing.T) {
-	t.Parallel()
-
-	afs, dir := setupTestCache(t)
-	idx, err := LoadIndex(afs, dir)
-	if err != nil {
-		t.Fatalf("LoadIndex: %v", err)
-	}
-	env := &docsEnv{FS: afs, CacheDir: dir, Version: "v0.55.x", Depth: 1}
-
-	tests := []struct {
-		name string
-		args []string
-		want string
-	}{
-		{name: "slash", args: []string{"k6-mod-b/leaf-one"}, want: "LeafOne"},
-		{name: "space", args: []string{"k6-mod-b", "leaf-one"}, want: "LeafOne"},
-		{name: "bare_slash", args: []string{"mod-b/leaf-one"}, want: "LeafOne"},
-		{name: "full_slug", args: []string{"javascript-api", "k6-mod-b", "leaf-one"}, want: "LeafOne"},
-		{name: "full_slug_bare", args: []string{"javascript-api", "mod-b", "leaf-one"}, want: "LeafOne"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			var buf strings.Builder
-			printSearch(env, &buf, idx, tt.args)
-			if !strings.Contains(buf.String(), tt.want) {
-				t.Errorf("printSearch(%v) = %q, want substring %q", tt.args, buf.String(), tt.want)
-			}
-		})
-	}
-}
-
-func TestPrintSearchNoResults(t *testing.T) {
-	t.Parallel()
-
-	afs, dir := setupTestCache(t)
-	idx, err := LoadIndex(afs, dir)
-	if err != nil {
-		t.Fatalf("LoadIndex: %v", err)
-	}
-	env := &docsEnv{FS: afs, CacheDir: dir, Version: "v0.55.x", Depth: 1}
-
-	var buf strings.Builder
-	printSearch(env, &buf, idx, []string{"zzzznotfound"})
-	want := "(no results)\n"
-	if buf.String() != want {
-		t.Errorf("no results: got %q, want %q", buf.String(), want)
-	}
-}
-
-func TestPrintSearchDepth(t *testing.T) {
-	t.Parallel()
-
-	afs, dir := setupTestCache(t)
-	idx, err := LoadIndex(afs, dir)
-	if err != nil {
-		t.Fatalf("LoadIndex: %v", err)
-	}
-
-	t.Run("search always shows children regardless of depth", func(t *testing.T) {
-		t.Parallel()
-		env := &docsEnv{FS: afs, CacheDir: dir, Version: "v0.55.x", Depth: 1}
-		var buf strings.Builder
-		printSearch(env, &buf, idx, []string{"k6"})
-		got := buf.String()
-		if !strings.Contains(got, "- k6-mod-a\n") {
-			t.Errorf("expected group header, got %q", got)
-		}
-		if !strings.Contains(got, "  - fn-one") {
-			t.Errorf("depth 1 search should still show children, got %q", got)
-		}
-	})
-
-	t.Run("single group auto-navigates to deepest match", func(t *testing.T) {
-		t.Parallel()
-		env := &docsEnv{FS: afs, CacheDir: dir, Version: "v0.55.x", Depth: 1}
-		var buf strings.Builder
-		printSearch(env, &buf, idx, []string{"child-a"})
-		got := buf.String()
-		if !strings.Contains(got, "ChildA.clear") {
-			t.Errorf("single group: expected deepest match (ChildA.clear), got %q", got)
-		}
-	})
-}
-
-// newTestGlobalState creates a GlobalState with an in-memory filesystem for unit tests.
-func newTestGlobalState(t *testing.T, afs fsext.Fs) *state.GlobalState {
-	t.Helper()
-
-	gs := state.NewGlobalState(t.Context())
-	gs.FS = afs
-	gs.Env = map[string]string{}
-
-	return gs
-}
-
-// setupTestCache creates an in-memory cache with sections.json and markdown files.
-// Used by TTY-dependent tests in config_test.go that can't be tested via testscript.
-func setupTestCache(t *testing.T) (fsext.Fs, string) {
-	t.Helper()
-
-	afs := fsext.NewMemMapFs()
-	dir := "/tmp/testcache"
-	if err := afs.MkdirAll(dir, 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-
-	sections := []Section{
-		{
-			Slug:        "javascript-api",
-			RelPath:     "javascript-api/_index.md",
-			Title:       "JavaScript API",
-			Description: "k6 JavaScript API reference.",
-			Weight:      1,
-			Category:    "javascript-api",
-			Children:    []string{"javascript-api/k6-mod-a", "javascript-api/k6-mod-b", "javascript-api/lib-c"},
-			IsIndex:     true,
-		},
-		{
-			Slug:        "javascript-api/k6-mod-a",
-			RelPath:     "javascript-api/k6-mod-a/_index.md",
-			Title:       "k6/mod-a",
-			Description: "Module A for k6.",
-			Weight:      1,
-			Category:    "javascript-api",
-			Children:    []string{"javascript-api/k6-mod-a/fn-one", "javascript-api/k6-mod-a/fn-two", "javascript-api/k6-mod-a/child-a", "javascript-api/k6-mod-a/k6-mod-a-fn-one"},
-			IsIndex:     true,
-		},
-		{
-			Slug:        "javascript-api/k6-mod-a/fn-one",
-			RelPath:     "javascript-api/k6-mod-a/fn-one.md",
-			Title:       "fn-one",
-			Description: "First function.",
-			Weight:      1,
-			Category:    "javascript-api",
-			Children:    nil,
-			IsIndex:     false,
-		},
-		{
-			Slug:        "javascript-api/k6-mod-a/fn-two",
-			RelPath:     "javascript-api/k6-mod-a/fn-two.md",
-			Title:       "fn-two",
-			Description: "Second function.",
-			Weight:      2,
-			Category:    "javascript-api",
-			Children:    nil,
-			IsIndex:     false,
-		},
-		{
-			Slug:        "javascript-api/k6-mod-a/k6-mod-a-fn-one",
-			RelPath:     "javascript-api/k6-mod-a/k6-mod-a-fn-one.md",
-			Title:       "fn-one (alternate)",
-			Description: "Alternate fn-one endpoint.",
-			Weight:      4,
-			Category:    "javascript-api",
-			Children:    nil,
-			IsIndex:     false,
-		},
-		{
-			Slug:        "javascript-api/k6-mod-a/child-a",
-			RelPath:     "javascript-api/k6-mod-a/child-a/_index.md",
-			Title:       "ChildA",
-			Description: "Child A reference.",
-			Weight:      3,
-			Category:    "javascript-api",
-			Children:    []string{"javascript-api/k6-mod-a/child-a/child-a-clear"},
-			IsIndex:     true,
-		},
-		{
-			Slug:        "javascript-api/k6-mod-a/child-a/child-a-clear",
-			RelPath:     "javascript-api/k6-mod-a/child-a/child-a-clear.md",
-			Title:       "ChildA.clear",
-			Description: "Clear all items.",
-			Weight:      1,
-			Category:    "javascript-api",
-			Children:    nil,
-			IsIndex:     false,
-		},
-		{
-			Slug:        "javascript-api/lib-c",
-			RelPath:     "javascript-api/lib-c/_index.md",
-			Title:       "lib-c",
-			Description: "Library C reference.",
-			Weight:      5,
-			Category:    "javascript-api",
-			Children:    nil,
-			IsIndex:     true,
-		},
-		{
-			Slug:        "javascript-api/k6-mod-b",
-			RelPath:     "javascript-api/k6-mod-b/_index.md",
-			Title:       "k6/mod-b",
-			Description: "Module B for k6.",
-			Weight:      4,
-			Category:    "javascript-api",
-			Children:    []string{"javascript-api/k6-mod-b/leaf-one"},
-			IsIndex:     true,
-		},
-		{
-			Slug:        "javascript-api/k6-mod-b/leaf-one",
-			RelPath:     "javascript-api/k6-mod-b/leaf-one.md",
-			Title:       "LeafOne",
-			Description: "Represents a leaf node.",
-			Weight:      1,
-			Category:    "javascript-api",
-			Children:    nil,
-			IsIndex:     false,
-		},
-		{
-			Slug:        "alpha",
-			RelPath:     "alpha/_index.md",
-			Title:       "Alpha",
-			Description: "Learn how to use k6.",
-			Weight:      2,
-			Category:    "alpha",
-			Children:    []string{"alpha/topic-one"},
-			IsIndex:     true,
-		},
-		{
-			Slug:        "alpha/topic-one",
-			RelPath:     "alpha/topic-one.md",
-			Title:       "TopicOne",
-			Description: "Configure test topic-one.",
-			Weight:      1,
-			Category:    "alpha",
-			Children:    nil,
-			IsIndex:     false,
-		},
-		{
-			Slug:        "beta",
-			RelPath:     "beta/_index.md",
-			Title:       "Beta",
-			Description: "Example k6 scripts.",
-			Weight:      3,
-			Category:    "beta",
-			Children:    []string{"beta/topic-four"},
-			IsIndex:     true,
-		},
-		{
-			Slug:        "beta/topic-four",
-			RelPath:     "beta/topic-four.md",
-			Title:       "TopicFour",
-			Description: "TopicFour load testing examples including real-time bidirectional communication patterns and analysis",
-			Weight:      1,
-			Category:    "beta",
-			Children:    nil,
-			IsIndex:     false,
-		},
-	}
-
-	idx := &Index{
-		Version:  "v0.55.x",
-		Sections: sections,
-	}
-
-	data, err := json.Marshal(idx)
-	if err != nil {
-		t.Fatalf("marshal index: %v", err)
-	}
-	if err := fsext.WriteFile(afs, filepath.Join(dir, "sections.json"), data, 0o644); err != nil {
-		t.Fatalf("write sections.json: %v", err)
-	}
-
-	mdFiles := map[string]string{
-		"javascript-api/_index.md":                         "---\ntitle: 'JavaScript API'\n---\n# JavaScript API\n\nThe JavaScript API reference.\n",
-		"javascript-api/k6-mod-a/_index.md":                "---\ntitle: 'k6/mod-a'\n---\n# k6/mod-a\n\nThe mod-a module.\n",
-		"javascript-api/lib-c/_index.md":                   "---\ntitle: 'lib-c'\n---\n# lib-c\n\nLibrary C reference.\n",
-		"javascript-api/k6-mod-b/_index.md":                "---\ntitle: 'k6/mod-b'\n---\n# k6/mod-b\n\nModule B.\n",
-		"javascript-api/k6-mod-b/leaf-one.md":              "---\ntitle: 'LeafOne'\n---\n# LeafOne\n\nRepresents a leaf node.\n",
-		"javascript-api/k6-mod-a/fn-one.md":                "---\ntitle: 'fn-one'\n---\n## modA.fnOne(url)\n\nFirst function call.\n",
-		"javascript-api/k6-mod-a/fn-two.md":                "---\ntitle: 'fn-two'\n---\n## modA.fnTwo(url, body)\n\nSecond function call.\n",
-		"javascript-api/k6-mod-a/k6-mod-a-fn-one.md":       "---\ntitle: 'fn-one (alternate)'\n---\n## modA.fnOne(url) [alternate]\n\nAlternate fn-one endpoint.\n",
-		"javascript-api/k6-mod-a/child-a/_index.md":        "---\ntitle: 'ChildA'\n---\n# ChildA\n\nChild A reference.\n",
-		"javascript-api/k6-mod-a/child-a/child-a-clear.md": "---\ntitle: 'ChildA.clear'\n---\n## ChildA.clear()\n\nClears all items.\n",
-		"alpha/_index.md":                                  "---\ntitle: 'Alpha'\n---\n# Alpha\n\nGuide to Alpha.\n",
-		"alpha/topic-one.md":                               "---\ntitle: 'TopicOne'\n---\n# TopicOne\n\nTopicOne lets you configure execution.\n",
-		"beta/_index.md":                                   "---\ntitle: 'Beta'\n---\n# Beta\n\nExample scripts.\n",
-		"beta/topic-four.md":                               "---\ntitle: 'TopicFour'\n---\n# TopicFour\n\nTopicFour example content.\n",
-	}
-
-	for relPath, content := range mdFiles {
-		fullPath := filepath.Join(dir, "markdown", relPath)
-		if err := afs.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
-			t.Fatalf("mkdir %s: %v", filepath.Dir(fullPath), err)
-		}
-		if err := fsext.WriteFile(afs, fullPath, []byte(content), 0o644); err != nil {
-			t.Fatalf("write %s: %v", fullPath, err)
-		}
-	}
-
-	bpPath := filepath.Join(dir, "best_practices.md")
-	if err := fsext.WriteFile(afs, bpPath, []byte("---\ntitle: Best Practices\n---\nFollow these best practices for k6.\n"), 0o644); err != nil {
-		t.Fatalf("write best_practices.md: %v", err)
-	}
-
-	if _, err = LoadIndex(afs, dir); err != nil {
-		t.Fatalf("LoadIndex: %v", err)
-	}
-
-	return afs, dir
 }

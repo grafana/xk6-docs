@@ -1,0 +1,25 @@
+# HOME determines default cache location.
+env HOME=$WORK/fakehome
+env USERPROFILE=
+env K6_DOCS_VERSION=v0.55.x
+env K6_DOCS_CACHE_DIR=
+cpdir $WORK/cache $WORK/fakehome/.local/share/k6/docs/v0.55.x
+exec ./k6 x docs
+stdout '# k6 v0\.55\.x'
+
+# USERPROFILE used when HOME is empty.
+env HOME=
+env USERPROFILE=$WORK/profilehome
+env K6_DOCS_VERSION=v0.55.x
+env K6_DOCS_CACHE_DIR=
+cpdir $WORK/cache $WORK/profilehome/.local/share/k6/docs/v0.55.x
+exec ./k6 x docs
+stdout '# k6 v0\.55\.x'
+
+# Neither HOME nor USERPROFILE → error.
+env HOME=
+env USERPROFILE=
+env K6_DOCS_VERSION=v0.55.x
+env K6_DOCS_CACHE_DIR=
+! exec ./k6 x docs
+stderr 'neither HOME nor USERPROFILE'

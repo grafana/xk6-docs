@@ -1,38 +1,58 @@
 # Title/description match
-k6-docs --cache-dir $WORK/cache --version v0.55.x search guide
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search guide
 cmp stdout golden-guide.txt
 
 # Single result from description match shows doc
-k6-docs --cache-dir $WORK/cache --version v0.55.x search 'fn-one operation'
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search 'fn-one operation'
 stdout '## modA.fnOne'
 
 # Multi-group sorted alphabetically
-k6-docs --cache-dir $WORK/cache --version v0.55.x search k6
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search k6
 cmp stdout golden-k6.txt
 
 # Single result from body match shows doc
-k6-docs --cache-dir $WORK/cache --version v0.55.x search 'TopicTwo content'
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search 'TopicTwo content'
 stdout '# TopicTwo'
 
 # No results
-k6-docs --cache-dir $WORK/cache --version v0.55.x search zzzznotfound
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search zzzznotfound
 stdout '\(no results\)'
 
 # Search example hint has no blank line before it
-k6-docs --cache-dir $WORK/cache --version v0.55.x --depth 2 search k6
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x --depth 2 search k6
 ! stdout '^\n>'
 
 # Single group goes to deepest match, not group parent
-k6-docs --cache-dir $WORK/cache --version v0.55.x search child-a-clear
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search child-a-clear
 stdout 'ChildA.clear'
 
+# Search resolves slash args the same as space args
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search k6-mod-b/leaf-one
+stdout 'LeafOne'
+
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search k6-mod-b leaf-one
+stdout 'LeafOne'
+
+# Search resolves bare module name without k6- prefix
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search mod-b/leaf-one
+stdout 'LeafOne'
+
+# Search resolves full slug path
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search javascript-api k6-mod-b leaf-one
+stdout 'LeafOne'
+
+# Search --depth 1 still shows children (search overrides depth)
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x --depth 1 search k6
+stdout '  - fn-one'
+
 # Missing arg errors
-! k6-docs --cache-dir $WORK/cache --version v0.55.x search
+! exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search
 stderr 'requires at least 1 arg'
 
 -- golden-guide.txt --
 - alpha
 - gamma
+- showcase
 -- golden-fn-one-operation.txt --
 - k6-mod-a
 -- golden-fn-one-depth2.txt --
@@ -49,4 +69,5 @@ stderr 'requires at least 1 arg'
   - fn-two
 - k6-mod-b
   - leaf-one
+- showcase
 > Example: `k6 x docs mod-a child-a`

@@ -1,0 +1,4 @@
+# Non-TTY mode: raw markdown output without ANSI codes.
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a fn-one
+! stdout '\x1b\['
+stdout 'modA.fnOne'

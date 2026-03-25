@@ -1,7 +1,5 @@
-# No --version flag, no K6_DOCS_VERSION env.
-# DetectK6Version reads go.k6.io/k6 from build info.
-# In the test binary, dependency info is not embedded,
-# so auto-detection fails with a clear error.
+# Auto-detect from build info succeeds with the real k6 binary.
+# It finds go.k6.io/k6 v1.5.0 and maps to v1.5.x.
 env K6_DOCS_CACHE_DIR=$WORK/cache
-! k6-docs
-stderr 'dependency not found in build info'
+exec ./k6 x docs
+stdout '# k6 v1\.5\.x'

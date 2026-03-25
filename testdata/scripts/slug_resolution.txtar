@@ -1,29 +1,29 @@
 # Full slug with /
-k6-docs --cache-dir $WORK/cache --version v0.55.x javascript-api/k6-mod-a/fn-one
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x javascript-api/k6-mod-a/fn-one
 cmp stdout golden-fn-one.txt
 
 # JS API shortcut (same output proves correct resolution)
-k6-docs --cache-dir $WORK/cache --version v0.55.x mod-a fn-one
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a fn-one
 cmp stdout golden-fn-one.txt
 
 # Case insensitive
-k6-docs --cache-dir $WORK/cache --version v0.55.x MOD-A FN-ONE
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x MOD-A FN-ONE
 cmp stdout golden-fn-one.txt
 
 # k6- prefix dedup
-k6-docs --cache-dir $WORK/cache --version v0.55.x k6-mod-a fn-one
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x k6-mod-a fn-one
 cmp stdout golden-fn-one.txt
 
 # Category prefix
-k6-docs --cache-dir $WORK/cache --version v0.55.x alpha topic-one
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x alpha topic-one
 cmp stdout golden-topic-one.txt
 
 # Parent prefix fallback (child-a/clear → child-a/child-a-clear)
-k6-docs --cache-dir $WORK/cache --version v0.55.x mod-a child-a clear
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a child-a clear
 cmp stdout golden-clear.txt
 
 # Bare name prefers unprefixed (both lib-c and k6-lib-c exist)
-k6-docs --cache-dir $WORK/cache --version v0.55.x lib-c
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x lib-c
 cmp stdout golden-lib-c.txt
 
 -- golden-fn-one.txt --

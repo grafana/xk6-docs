@@ -1,0 +1,48 @@
+# No args shows agent help table with all supported agents.
+exec ./k6 x docs skill
+cp stdout skill-output.txt
+containslines expected-agents.txt skill-output.txt
+
+# Install creates SKILL.md with correct binary path and scripts dir.
+exec ./k6 x docs skill $WORK/dest
+stdout 'Skill installed'
+exists $WORK/dest/xk6-docs/SKILL.md
+exists $WORK/dest/xk6-docs/scripts/validate-paths.sh
+grep 'x docs' $WORK/dest/xk6-docs/SKILL.md
+! grep '<binary>' $WORK/dest/xk6-docs/SKILL.md
+grep '/.*x docs' $WORK/dest/xk6-docs/SKILL.md
+checkperm 0750 $WORK/dest/xk6-docs/scripts/validate-paths.sh
+
+# Reinstall removes stale files and updates content.
+cp stale.txt $WORK/dest/xk6-docs/stale.txt
+exists $WORK/dest/xk6-docs/stale.txt
+exec ./k6 x docs skill $WORK/dest
+! exists $WORK/dest/xk6-docs/stale.txt
+exists $WORK/dest/xk6-docs/SKILL.md
+
+# resolveBinaryPath PATH branch: bare name resolves via exec.LookPath.
+mkdir $WORK/bin
+cp $WORK/k6 $WORK/bin/k6
+env PATH=$WORK/bin
+exec $WORK/bin/k6 x docs skill $WORK/dest-path
+grep 'bin/k6 x docs' $WORK/dest-path/xk6-docs/SKILL.md
+
+# resolveBinaryPath relative-path branch: ./k6 resolves to absolute path.
+cd $WORK
+exec ./k6 x docs skill $WORK/dest-rel
+grep '/k6 x docs' $WORK/dest-rel/xk6-docs/SKILL.md
+
+-- expected-agents.txt --
+Claude Code
+Cursor
+Codex
+Gemini CLI
+GitHub Copilot
+Amp
+Cline
+OpenCode
+Windsurf
+Roo Code
+Goose
+-- stale.txt --
+leftover

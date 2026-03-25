@@ -1,17 +1,33 @@
+# Empty search term returns no results
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search ''
+stdout '\(no results\)'
+
+# Fuzzy: spaces match dashed slug (topic one → topic-one)
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search 'topic one'
+stdout 'TopicOne'
+
+# Fuzzy: dashes match concatenated title (sub-one → SubOne)
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search sub-one
+stdout 'SubOne'
+
+# Fuzzy: spaces match slashed slug (delta sub-one → delta/sub-one)
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search 'delta subone'
+stdout 'SubOne'
+
 # No results exact format
-k6-docs --cache-dir $WORK/cache --version v0.55.x search zzzznotfound
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search zzzznotfound
 cmp stdout golden-no-results.txt
 
 # Single result from multi-word search shows doc
-k6-docs --cache-dir $WORK/cache --version v0.55.x search TopicTwo content
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search TopicTwo content
 stdout '# TopicTwo'
 
 # Normalized match: single group shows doc directly
-k6-docs --cache-dir $WORK/cache --version v0.55.x search child-a
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search child-a
 stdout '# ChildA'
 
 # bare javascript-api excluded from grouping
-k6-docs --cache-dir $WORK/cache --version v0.55.x search k6
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search k6
 cmp stdout golden-k6.txt
 ! stdout 'javascript-api:'
 
@@ -27,4 +43,5 @@ cmp stdout golden-k6.txt
   - fn-two
 - k6-mod-b
   - leaf-one
+- showcase
 > Example: `k6 x docs mod-a child-a`

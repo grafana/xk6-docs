@@ -1,17 +1,17 @@
 # Rule 1: slash in args[0] with multiple args → join all with /
-k6-docs --cache-dir $WORK/cache --version v0.55.x javascript-api/k6-mod-a fn-one
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x javascript-api/k6-mod-a fn-one
 cmp stdout golden-fn-one.txt
 
 # Rule 1: slash in later arg → error (joins to nonexistent path)
-! k6-docs --cache-dir $WORK/cache --version v0.55.x mod-a k6-mod-a/fn-one
+! exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a k6-mod-a/fn-one
 stderr 'topic not found'
 
 # Category matching is case-insensitive (resolved via index lookup)
-k6-docs --cache-dir $WORK/cache --version v0.55.x Alpha topic-one
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x Alpha topic-one
 stdout 'TopicOne'
 
 # Nonexistent slug after fallback
-! k6-docs --cache-dir $WORK/cache --version v0.55.x totally-fake-module nonexistent
+! exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x totally-fake-module nonexistent
 stderr 'topic not found'
 
 -- golden-fn-one.txt --

@@ -1,0 +1,214 @@
+# Download and extract docs from mock server.
+env HOME=$WORK/home
+env K6_DOCS_VERSION=v0.55.x
+env K6_DOCS_CACHE_DIR=
+bundlesrv $WORK/bundle
+exec ./k6 x docs
+stdout '# k6 v0\.55\.x'
+stdout 'javascript-api'
+
+# Metadata written after download.
+exists $WORK/home/.local/share/k6/docs/v0.55.x/.last_check
+exists $WORK/home/.local/share/k6/docs/v0.55.x/.etag
+grep '"v1"' $WORK/home/.local/share/k6/docs/v0.55.x/.etag
+
+# Second call serves from cache (no re-download needed).
+exec ./k6 x docs
+stdout '# k6 v0\.55\.x'
+
+# HTTP error → download fails.
+cp status-404.txt $WORK/.bundlesrv-status
+env HOME=$WORK/home2
+! exec ./k6 x docs
+stderr 'download docs'
+
+# Staleness: fresh cache skips re-check.
+env HOME=$WORK/home3
+rm $WORK/.bundlesrv-status
+bundlesrv $WORK/bundle
+exec ./k6 x docs
+stdout '# k6 v0\.55\.x'
+# Change server content — but cache is fresh, so no re-download.
+cp updated-index.txt $WORK/bundle/sections.json
+exec ./k6 x docs
+stdout '# k6 v0\.55\.x'
+stdout 'javascript-api'
+# Restore original bundle content for subsequent tests.
+cp original-index.txt $WORK/bundle/sections.json
+
+# Staleness: stale cache with different ETag triggers re-download.
+env HOME=$WORK/home4
+rm $WORK/.bundlesrv-etag
+bundlesrv $WORK/bundle-v2
+exec ./k6 x docs
+stdout '# k6 v0\.55\.x'
+backdate-lastcheck $WORK/home4/.local/share/k6/docs/v0.55.x
+cp etag-v2.txt $WORK/.bundlesrv-etag
+exec ./k6 x docs
+stdout '- updated'
+
+# Staleness: same ETag → no re-download (content stays from first download).
+env HOME=$WORK/home-same-etag
+rm $WORK/.bundlesrv-etag
+bundlesrv $WORK/bundle
+exec ./k6 x docs
+stdout 'javascript-api'
+backdate-lastcheck $WORK/home-same-etag/.local/share/k6/docs/v0.55.x
+# Server now serves different content but SAME ETag → should NOT re-download.
+bundlesrv $WORK/bundle-v2
+exec ./k6 x docs
+stdout 'javascript-api'
+! stdout '- updated'
+
+# Oversized file in bundle → extraction error.
+env HOME=$WORK/home-oversize
+rm $WORK/.bundlesrv-etag
+cp oversize-flag.txt $WORK/.bundlesrv-oversize
+bundlesrv $WORK/bundle
+! exec ./k6 x docs
+stderr 'exceeds maximum size'
+rm $WORK/.bundlesrv-oversize
+
+# Path traversal in tar → extraction error.
+env HOME=$WORK/home-badpath
+cp badpath-flag.txt $WORK/.bundlesrv-badpath
+bundlesrv $WORK/bundle
+! exec ./k6 x docs
+stderr 'extract docs'
+rm $WORK/.bundlesrv-badpath
+
+# Symlink in tar → skipped, regular files extracted fine.
+env HOME=$WORK/home-symlink
+cp symlink-flag.txt $WORK/.bundlesrv-symlink
+bundlesrv $WORK/bundle
+exec ./k6 x docs
+stdout 'javascript-api'
+! exists $WORK/home-symlink/.local/share/k6/docs/v0.55.x/link.txt
+exists $WORK/home-symlink/.local/share/k6/docs/v0.55.x/sections.json
+rm $WORK/.bundlesrv-symlink
+
+# Cleanup on failure: oversized file removes cache directory.
+env HOME=$WORK/home-cleanup
+cp oversize-flag.txt $WORK/.bundlesrv-oversize
+bundlesrv $WORK/bundle
+! exec ./k6 x docs
+! exists $WORK/home-cleanup/.local/share/k6/docs/v0.55.x
+rm $WORK/.bundlesrv-oversize
+
+# Multi-version coexistence: two versions cached independently.
+env HOME=$WORK/home-multi
+env K6_DOCS_VERSION=v1.0.x
+bundlesrv $WORK/bundle
+exec ./k6 x docs
+stdout 'javascript-api'
+env K6_DOCS_VERSION=v2.0.x
+bundlesrv $WORK/bundle-v2
+exec ./k6 x docs
+stdout '- updated'
+# Both versions still cached.
+env K6_DOCS_VERSION=v1.0.x
+exec ./k6 x docs
+stdout 'javascript-api'
+
+# File permissions after extraction.
+env HOME=$WORK/home-perms
+env K6_DOCS_VERSION=v0.55.x
+bundlesrv $WORK/bundle-perms
+exec ./k6 x docs
+checkperm 0750 $WORK/home-perms/.local/share/k6/docs/v0.55.x
+checkperm 0640 $WORK/home-perms/.local/share/k6/docs/v0.55.x/sections.json
+
+# Staleness: corrupt .last_check self-heals.
+env HOME=$WORK/home-corrupt-lc
+bundlesrv $WORK/bundle
+exec ./k6 x docs
+stdout 'javascript-api'
+cp corrupt-timestamp.txt $WORK/home-corrupt-lc/.local/share/k6/docs/v0.55.x/.last_check
+exec ./k6 x docs
+stdout 'javascript-api'
+
+# Staleness: corrupt .etag self-heals (triggers re-download with new content).
+env HOME=$WORK/home-corrupt-etag
+bundlesrv $WORK/bundle
+exec ./k6 x docs
+stdout 'javascript-api'
+backdate-lastcheck $WORK/home-corrupt-etag/.local/share/k6/docs/v0.55.x
+cp empty.txt $WORK/home-corrupt-etag/.local/share/k6/docs/v0.55.x/.etag
+cp etag-v2.txt $WORK/.bundlesrv-etag
+bundlesrv $WORK/bundle-v2
+exec ./k6 x docs
+stdout '- updated'
+
+# Staleness: network error falls back to cached copy.
+env HOME=$WORK/home-netfail
+rm $WORK/.bundlesrv-etag
+bundlesrv $WORK/bundle
+exec ./k6 x docs
+stdout 'javascript-api'
+backdate-lastcheck $WORK/home-netfail/.local/share/k6/docs/v0.55.x
+cp status-500.txt $WORK/.bundlesrv-status
+exec ./k6 x docs
+stdout 'javascript-api'
+
+# Staleness: slow server times out, falls back to cache.
+# Use a 1s timeout to keep the test fast.
+env HOME=$WORK/home-slow
+env K6_DOCS_REFRESH_TIMEOUT=1s
+rm $WORK/.bundlesrv-status
+bundlesrv $WORK/bundle
+exec ./k6 x docs
+stdout 'javascript-api'
+backdate-lastcheck $WORK/home-slow/.local/share/k6/docs/v0.55.x
+cp slow-flag.txt $WORK/.bundlesrv-slow
+exec ./k6 x docs
+stdout 'javascript-api'
+rm $WORK/.bundlesrv-slow
+env K6_DOCS_REFRESH_TIMEOUT=
+
+# Bundle size cap: download >100MB → error.
+env HOME=$WORK/home-bundlecap
+mkzeroes 104857601 $WORK/.bundlesrv-raw-body
+mkzeroes 0 $WORK/.bundlesrv-raw-file
+bundlesrv $WORK/bundle
+! exec ./k6 x docs
+stderr 'bundle exceeds maximum size'
+rm $WORK/.bundlesrv-raw-file
+rm $WORK/.bundlesrv-raw-body
+
+-- bundle/sections.json --
+{"version":"v0.55.x","sections":[{"slug":"javascript-api","rel_path":"javascript-api/_index.md","title":"JavaScript API","description":"k6 JS API.","weight":1,"category":"javascript-api","children":null,"is_index":true}]}
+-- bundle/markdown/javascript-api/_index.md --
+# JavaScript API
+
+The k6 JavaScript API reference documentation.
+-- bundle-perms/sections.json --
+{"version":"v0.55.x","sections":[{"slug":"perms-test","rel_path":"perms-test/_index.md","title":"PermsTest","description":"Perms.","weight":1,"category":"perms-test","children":null,"is_index":true}]}
+-- bundle-perms/markdown/perms-test/_index.md --
+# PermsTest
+-- status-404.txt --
+404
+-- status-500.txt --
+500
+-- bundle-v2/sections.json --
+{"version":"v0.55.x","sections":[{"slug":"updated","rel_path":"updated/_index.md","title":"Updated","description":"Updated docs.","weight":1,"category":"updated","children":null,"is_index":true}]}
+-- bundle-v2/markdown/updated/_index.md --
+# Updated docs
+
+This is the updated version.
+-- etag-v2.txt --
+"v2"
+-- updated-index.txt --
+{"version":"v0.55.x","sections":[{"slug":"changed","rel_path":"changed/_index.md","title":"Changed","description":"Changed.","weight":1,"category":"changed","children":null,"is_index":true}]}
+-- original-index.txt --
+{"version":"v0.55.x","sections":[{"slug":"javascript-api","rel_path":"javascript-api/_index.md","title":"JavaScript API","description":"k6 JS API.","weight":1,"category":"javascript-api","children":null,"is_index":true}]}
+-- slow-flag.txt --
+1
+-- oversize-flag.txt --
+1
+-- badpath-flag.txt --
+1
+-- symlink-flag.txt --
+1
+-- corrupt-timestamp.txt --
+not-a-timestamp
+-- empty.txt --

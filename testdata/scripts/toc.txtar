@@ -1,4 +1,4 @@
-k6-docs --cache-dir $WORK/cache --version v0.55.x
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x
 cmp stdout golden.txt
 
 -- golden.txt --
@@ -10,5 +10,6 @@ cmp stdout golden.txt
 - delta
 - epsilon
 - zeta
+- showcase
 
 > Example: `k6 x docs <topic>`

@@ -9,6 +9,7 @@ help: ## Show this help
 
 lint: ## Run linters
 	golangci-lint run ./...
+	xk6 lint --preset official
 
 test: ## Run tests
 	RUN_SMOKE_E2E=1 K6_BIN=$(K6_BIN) go test -race -count=1 ./...

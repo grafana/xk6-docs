@@ -1,22 +1,27 @@
 # best-practices ignores extra args
-k6-docs --cache-dir $WORK/cache --version v0.55.x best-practices extra-arg
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x best-practices extra-arg
 ! stdout 'extra-arg'
 stdout 'best practices'
 
 # best-practices is case-sensitive
-! k6-docs --cache-dir $WORK/cache --version v0.55.x Best-Practices
+! exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x Best-Practices
 stderr 'topic not found'
 
 # --version and --cache-dir inherited by search subcommand
-k6-docs --cache-dir $WORK/cache --version v0.55.x search k6
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search k6
 stdout '- k6-mod-a'
 
 # --depth 1 shows flat list (same as default)
-k6-docs --cache-dir $WORK/cache --version v0.55.x --depth 1
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x --depth 1
 stdout '- javascript-api'
 ! stdout '  - k6-mod-a'
 
+# --depth 2 shows one level of children but not grandchildren
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x --depth 2
+stdout '  - k6-mod-a'
+! stdout '    - fn-one'
+
 # --depth 3 shows grandchildren
-k6-docs --cache-dir $WORK/cache --version v0.55.x --depth 3
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x --depth 3
 stdout '  - k6-mod-a'
 stdout '    - fn-one'

@@ -1,13 +1,13 @@
 # Top-level categories resolve correctly
-k6-docs --cache-dir $WORK/cache --version v0.55.x delta
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x delta
 stdout 'Delta'
 
-k6-docs --cache-dir $WORK/cache --version v0.55.x epsilon
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x epsilon
 stdout 'Epsilon'
 
-k6-docs --cache-dir $WORK/cache --version v0.55.x zeta
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x zeta
 stdout 'Zeta'
 
 # Subtopic under delta
-k6-docs --cache-dir $WORK/cache --version v0.55.x delta sub-one
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x delta sub-one
 stdout 'SubOne'
