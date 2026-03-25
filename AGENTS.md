@@ -15,13 +15,13 @@
 - `k6 x docs search <query>` fuzzy searches (case-insensitive, ignores punctuation, spaces, slashes) and prints an indented tree: `- {group}` with `  - {child}` underneath, no descriptions. Footer shows `Example:` with a sample navigation command. Search uses the same arg normalization and resolve rules as docs navigation (shared `normalizeArgs` and `ResolveWithLookup`), so `search browser page`, `search browser/page`, and `search javascript-api browser page` all produce the same results. `--depth` flag controls tree depth (same as TOC/section footers).
 
 ## Slug resolution
-- Args are normalized first: slashes are split so `browser/elementhandle` is treated identically to `browser elementhandle`.
-- `k6 x docs http get` → `javascript-api/k6-http/get`
-- `k6 x docs javascript-api/k6-http/get` → `javascript-api/k6-http/get`
-- `k6 x docs javascript-api/browser/elementhandle` → `javascript-api/k6-browser/elementhandle`
-- `k6 x docs using-k6 scenarios` → `using-k6/scenarios`
-- k6-prefix fallback: `withK6Prefix` in `resolve.go` inserts `k6-` on the second segment of any `javascript-api/` slug when the original doesn't exist. Existing docs are prioritized (e.g. `jslib` stays as-is since `javascript-api/jslib` exists).
-- Parent-prefix fallback: `k6 x docs http cookiejar clear` → tries `.../cookiejar/clear` (miss) → `.../cookiejar/cookiejar-clear` (hit). Handled by `withParentFallback` in `resolve.go`.
+- Categories are derived from the bundle's `sections.json` at runtime — no hardcoded category list in the binary. If the first arg (or its first segment) exists as a slug in the index, it's used directly. Otherwise, it's treated as a JS API module shorthand.
+- Args are normalized first: slashes are split so `mod/child` is treated identically to `mod child`.
+- JS API shorthand: `k6 x docs mod child` → `javascript-api/k6-mod/child`
+- Full slug: `k6 x docs javascript-api/k6-mod/child` → `javascript-api/k6-mod/child`
+- Category: `k6 x docs some-category topic` → `some-category/topic` (when `some-category` exists in the index)
+- k6-prefix fallback: `withK6Prefix` in `resolve.go` inserts `k6-` on the second segment of any `javascript-api/` slug when the original doesn't exist. Existing docs are prioritized.
+- Parent-prefix fallback: `withParentFallback` in `resolve.go` retries `parent/child` as `parent/parent-child` when the original doesn't exist.
 
 ### Rendering
 - Built-in markdown rendering via `glamour` library (`render.go`). Automatically renders with ANSI styling when stdout is a TTY and color is enabled. Non-TTY output (e.g. piped to an agent) is raw markdown.
@@ -30,8 +30,8 @@
 - Stripped: Shared shortcodes (`{{< docs/shared >}}`), code tags (`{{< code >}}`), section tags (`{{< section >}}`), React/MDX component tags (`<Glossary>`), `<br/>`, internal doc links, image links, remaining markdown links, HTML comments, YAML frontmatter.
 - Converted: Admonitions (`{{< admonition type="warning" >}}`) → `> **Warning:** ...` blockquotes.
 - Placeholders replaced: `<K6_VERSION>` → actual version.
-- Internal doc links to included categories are converted to plain text (URL stripped). Links to excluded categories keep the URL.
-- Duplicate child names are deduplicated in search results (e.g. `javascript-api/k6-http/get` and `k6-http-get` both resolve to child name `get`, but only one is shown).
+- All internal doc links and remaining markdown links are stripped to plain text (URL removed).
+- Duplicate child names are deduplicated in search results.
 
 ### Documentation version handling
 - Auto-detects k6 version from Go build info.
@@ -43,7 +43,7 @@
 ### Bundle preparation (standalone `cmd/prepare/`)
 - Clones k6-docs if not present, checks out matching tag.
 - Builds shared content map from `docs/sources/shared/`.
-- Walks markdown files, parses YAML frontmatter (deduplicates duplicate keys by keeping first occurrence), derives slugs, filters to included categories.
+- Walks markdown files, parses YAML frontmatter (deduplicates duplicate keys by keeping first occurrence), derives slugs. All top-level directories are included (only the shared content directory is skipped).
 - Handles slug collisions: prefers `_index.md` over leaf `.md` (it has children).
 - Populates parent→child relationships.
 - Outputs: `dist/sections.json`, `dist/markdown/**/*.md`, `dist/best_practices.md`.

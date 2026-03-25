@@ -1,52 +1,52 @@
 # Full slug with /
-k6-docs --cache-dir $WORK/cache --version v0.55.x javascript-api/k6-http/get
-cmp stdout golden-get.txt
+k6-docs --cache-dir $WORK/cache --version v0.55.x javascript-api/k6-mod-a/fn-one
+cmp stdout golden-fn-one.txt
 
 # JS API shortcut (same output proves correct resolution)
-k6-docs --cache-dir $WORK/cache --version v0.55.x http get
-cmp stdout golden-get.txt
+k6-docs --cache-dir $WORK/cache --version v0.55.x mod-a fn-one
+cmp stdout golden-fn-one.txt
 
 # Case insensitive
-k6-docs --cache-dir $WORK/cache --version v0.55.x HTTP GET
-cmp stdout golden-get.txt
+k6-docs --cache-dir $WORK/cache --version v0.55.x MOD-A FN-ONE
+cmp stdout golden-fn-one.txt
 
 # k6- prefix dedup
-k6-docs --cache-dir $WORK/cache --version v0.55.x k6-http get
-cmp stdout golden-get.txt
+k6-docs --cache-dir $WORK/cache --version v0.55.x k6-mod-a fn-one
+cmp stdout golden-fn-one.txt
 
 # Category prefix
-k6-docs --cache-dir $WORK/cache --version v0.55.x using-k6 scenarios
-cmp stdout golden-scenarios.txt
+k6-docs --cache-dir $WORK/cache --version v0.55.x alpha topic-one
+cmp stdout golden-topic-one.txt
 
-# Parent prefix fallback (cookiejar/clear → cookiejar/cookiejar-clear)
-k6-docs --cache-dir $WORK/cache --version v0.55.x http cookiejar clear
+# Parent prefix fallback (child-a/clear → child-a/child-a-clear)
+k6-docs --cache-dir $WORK/cache --version v0.55.x mod-a child-a clear
 cmp stdout golden-clear.txt
 
-# Bare name prefers unprefixed (both jslib and k6-jslib exist)
-k6-docs --cache-dir $WORK/cache --version v0.55.x jslib
-cmp stdout golden-jslib.txt
+# Bare name prefers unprefixed (both lib-c and k6-lib-c exist)
+k6-docs --cache-dir $WORK/cache --version v0.55.x lib-c
+cmp stdout golden-lib-c.txt
 
--- golden-get.txt --
-## http.get(url, [params])
+-- golden-fn-one.txt --
+## modA.fnOne(url, [params])
 
-Make an HTTP GET request.
+Perform a fn-one operation.
 
-import http from 'k6/http';
+import modA from 'k6/mod-a';
 
 export default function () {
-  const res = http.get('https://test-api.k6.io/');
+  const res = modA.fnOne('https://test.example.com/');
 }
--- golden-scenarios.txt --
-# Scenarios
+-- golden-topic-one.txt --
+# TopicOne
 
-Scenarios let you configure how your test executes.
+TopicOne lets you configure execution.
 
-See the Scenarios documentation for details.
+See the TopicOne documentation for details.
 -- golden-clear.txt --
-## CookieJar.clear()
+## ChildA.clear()
 
-Clears all cookies from the cookie jar.
--- golden-jslib.txt --
-# jslib
+Clears all items.
+-- golden-lib-c.txt --
+# lib-c
 
-JavaScript utility library reference.
+Utility library reference.

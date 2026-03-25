@@ -4,8 +4,11 @@ cmp stdout golden.txt
 -- golden.txt --
 # k6 v0.55.x
 - javascript-api
-- using-k6
-- examples
-- testing-guides
+- alpha
+- beta
+- gamma
+- delta
+- epsilon
+- zeta
 
 > Example: `k6 x docs <topic>`

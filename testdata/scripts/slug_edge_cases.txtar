@@ -1,26 +1,26 @@
 # Rule 1: slash in args[0] with multiple args → join all with /
-k6-docs --cache-dir $WORK/cache --version v0.55.x javascript-api/k6-http get
-cmp stdout golden-get.txt
+k6-docs --cache-dir $WORK/cache --version v0.55.x javascript-api/k6-mod-a fn-one
+cmp stdout golden-fn-one.txt
 
 # Rule 1: slash in later arg → error (joins to nonexistent path)
-! k6-docs --cache-dir $WORK/cache --version v0.55.x http k6-http/get
+! k6-docs --cache-dir $WORK/cache --version v0.55.x mod-a k6-mod-a/fn-one
 stderr 'topic not found'
 
-# Category matching is case-sensitive
-! k6-docs --cache-dir $WORK/cache --version v0.55.x Using-k6 scenarios
-stderr 'topic not found'
+# Category matching is case-insensitive (resolved via index lookup)
+k6-docs --cache-dir $WORK/cache --version v0.55.x Alpha topic-one
+stdout 'TopicOne'
 
 # Nonexistent slug after fallback
 ! k6-docs --cache-dir $WORK/cache --version v0.55.x totally-fake-module nonexistent
 stderr 'topic not found'
 
--- golden-get.txt --
-## http.get(url, [params])
+-- golden-fn-one.txt --
+## modA.fnOne(url, [params])
 
-Make an HTTP GET request.
+Perform a fn-one operation.
 
-import http from 'k6/http';
+import modA from 'k6/mod-a';
 
 export default function () {
-  const res = http.get('https://test-api.k6.io/');
+  const res = modA.fnOne('https://test.example.com/');
 }

@@ -79,14 +79,16 @@ func run(
 	}
 
 	// Step 2: build shared content map.
-	sharedContent, err := buildSharedContentMap(afs, filepath.Join(versionRoot, "shared"))
+	sharedDir := filepath.Join(versionRoot, "shared")
+	sharedContent, err := buildSharedContentMap(afs, sharedDir)
 	if err != nil {
 		return fmt.Errorf("build shared content: %w", err)
 	}
 
 	// Step 3: walk documentation files and collect sections.
 	markdownDir := filepath.Join(outputDir, "markdown")
-	sections, err := walkAndProcess(afs, versionRoot, markdownDir, sharedContent)
+	sharedRel, _ := filepath.Rel(versionRoot, sharedDir)
+	sections, err := walkAndProcess(afs, versionRoot, markdownDir, sharedContent, filepath.ToSlash(sharedRel))
 	if err != nil {
 		return fmt.Errorf("walk docs: %w", err)
 	}
@@ -156,7 +158,7 @@ func mkTempDir(afs fsext.Fs) (string, error) {
 }
 
 // buildSharedContentMap reads all .md files under the shared directory and
-// returns a map keyed by the relative path (e.g. "javascript-api/k6-http.md").
+// returns a map keyed by the relative path (e.g. "javascript-api/module.md").
 func buildSharedContentMap(afs fsext.Fs, sharedDir string) (map[string]string, error) {
 	m := make(map[string]string)
 
@@ -244,17 +246,17 @@ func categoryFromSlug(slug string) string {
 // walkAndProcess walks the version root, processes included .md files,
 // and returns the collected sections.
 func walkAndProcess(
-	afs fsext.Fs, versionRoot, markdownDir string, sharedContent map[string]string,
+	afs fsext.Fs, versionRoot, markdownDir string, sharedContent map[string]string, skipDir string,
 ) ([]docs.Section, error) {
 	// Use a map to deduplicate sections by slug. When a slug collision
-	// occurs (e.g. cookiejar.md and cookiejar/_index.md both produce
-	// "javascript-api/k6-http/cookiejar"), prefer the _index.md entry
+	// occurs (e.g. child.md and child/_index.md both produce
+	// "javascript-api/k6-module/child"), prefer the _index.md entry
 	// because it represents a section with children.
 	sectionMap := make(map[string]docs.Section)
 	var slugOrder []string
 
 	err := fsext.Walk(afs, versionRoot, func(path string, info fs.FileInfo, err error) error {
-		return processEntry(afs, path, info, err, versionRoot, markdownDir, sharedContent, sectionMap, &slugOrder)
+		return processEntry(afs, path, info, err, versionRoot, markdownDir, sharedContent, skipDir, sectionMap, &slugOrder)
 	})
 
 	// Rebuild the slice in walk order.
@@ -271,6 +273,7 @@ func processEntry(
 	path string, info fs.FileInfo, err error,
 	versionRoot, markdownDir string,
 	sharedContent map[string]string,
+	skipDir string,
 	sectionMap map[string]docs.Section,
 	slugOrder *[]string,
 ) error {
@@ -285,7 +288,7 @@ func processEntry(
 	rel = filepath.ToSlash(rel)
 
 	if info.IsDir() {
-		if rel == "shared" {
+		if rel == skipDir {
 			return filepath.SkipDir
 		}
 		return nil
@@ -297,11 +300,6 @@ func processEntry(
 
 	// Skip the version root _index.md.
 	if rel == "_index.md" {
-		return nil
-	}
-
-	// Only include files from allowed categories.
-	if !docs.IsIncludedDocsPath(rel) {
 		return nil
 	}
 

@@ -39,15 +39,15 @@ weight: 1
 headless: true
 ---
 `)
-	writeFile(t, afs, filepath.Join(versionRoot, "shared", "javascript-api", "k6-http.md"), `---
-title: 'k6/http shared content'
+	writeFile(t, afs, filepath.Join(versionRoot, "shared", "javascript-api", "k6-mod-a.md"), `---
+title: 'k6/mod-a shared content'
 ---
 
-The k6/http module contains functionality for performing HTTP transactions.
+The k6/mod-a module contains functionality for performing requests.
 
-| Method | Description |
-|--------|-------------|
-| get    | Issue a GET request. |
+| Method  | Description |
+|---------|-------------|
+| fn-one  | Issue a first function call. |
 `)
 
 	// Create javascript-api category.
@@ -64,140 +64,140 @@ The list of k6 modules.
 {{< section >}}
 `)
 
-	writeFile(t, afs, filepath.Join(versionRoot, "javascript-api", "k6-http", "_index.md"), `---
-title: 'k6/http'
-description: 'The k6/http module contains functionality for performing HTTP transactions.'
+	writeFile(t, afs, filepath.Join(versionRoot, "javascript-api", "k6-mod-a", "_index.md"), `---
+title: 'k6/mod-a'
+description: 'The k6/mod-a module contains functionality for performing requests.'
 weight: 09
 ---
 
-# k6/http
+# k6/mod-a
 
-{{< docs/shared source="k6" lookup="javascript-api/k6-http.md" version="<K6_VERSION>" >}}
+{{< docs/shared source="k6" lookup="javascript-api/k6-mod-a.md" version="<K6_VERSION>" >}}
 `)
 
-	writeFile(t, afs, filepath.Join(versionRoot, "javascript-api", "k6-http", "get.md"), `---
-title: 'get( url, [params] )'
-description: 'Issue an HTTP GET request.'
+	writeFile(t, afs, filepath.Join(versionRoot, "javascript-api", "k6-mod-a", "fn-one.md"), `---
+title: 'fnOne( url, [params] )'
+description: 'Issue a first function call.'
 weight: 10
 ---
 
-# get( url, [params] )
+# fnOne( url, [params] )
 
-Make a GET request.
+Make a first function call.
 
-See the [API docs](https://grafana.com/docs/k6/<K6_VERSION>/javascript-api/k6-http/get).
+See the [API docs](https://grafana.com/docs/k6/<K6_VERSION>/javascript-api/k6-mod-a/fn-one).
 
 {{< code >}}
 
 `+"```javascript"+`
-import http from 'k6/http';
+import modA from 'k6/mod-a';
 
 export default function () {
-  const res = http.get('https://test.k6.io');
+  const res = modA.fnOne('https://test.example.com');
 }
 `+"```"+`
 
 {{< /code >}}
 `)
 
-	writeFile(t, afs, filepath.Join(versionRoot, "javascript-api", "k6-http", "post.md"), `---
-title: 'post( url, [body], [params] )'
-description: 'Issue an HTTP POST request.'
+	writeFile(t, afs, filepath.Join(versionRoot, "javascript-api", "k6-mod-a", "fn-two.md"), `---
+title: 'fnTwo( url, [body], [params] )'
+description: 'Issue a second function call.'
 weight: 20
 ---
 
-# post( url, [body], [params] )
+# fnTwo( url, [body], [params] )
 
-Make a POST request.
+Make a second function call.
 `)
 
-	// Create using-k6 category.
-	writeFile(t, afs, filepath.Join(versionRoot, "using-k6", "_index.md"), `---
-title: 'Using k6'
-description: 'The using k6 section.'
+	// Create alpha category.
+	writeFile(t, afs, filepath.Join(versionRoot, "alpha", "_index.md"), `---
+title: 'Alpha'
+description: 'The alpha section.'
 weight: 05
 ---
 
-# Using k6
+# Alpha
 `)
 
-	writeFile(t, afs, filepath.Join(versionRoot, "using-k6", "checks.md"), `---
-title: 'Checks'
-description: 'Checks validate boolean conditions.'
+	writeFile(t, afs, filepath.Join(versionRoot, "alpha", "topic-two.md"), `---
+title: 'TopicTwo'
+description: 'TopicTwo items validate boolean conditions.'
 weight: 400
 ---
 
-# Checks
+# TopicTwo
 
-Checks validate boolean conditions in your test.
+TopicTwo items validate boolean conditions in your test.
 
 {{< admonition type="note" >}}
 
-When a check fails, the script continues.
+When an item fails, the script continues.
 
 {{< /admonition >}}
 `)
 
-	writeFile(t, afs, filepath.Join(versionRoot, "using-k6", "thresholds.md"), `---
-title: 'Thresholds'
-description: 'Thresholds are pass/fail criteria.'
+	writeFile(t, afs, filepath.Join(versionRoot, "alpha", "topic-three.md"), `---
+title: 'TopicThree'
+description: 'TopicThree items are pass/fail criteria.'
 weight: 500
 ---
 
-# Thresholds
+# TopicThree
 
-Thresholds are pass/fail criteria for your test metrics.
+TopicThree items are pass/fail criteria for your test metrics.
 `)
 
-	// Create reference/glossary (should be included).
-	writeFile(t, afs, filepath.Join(versionRoot, "reference", "_index.md"), `---
-title: 'Reference'
-description: 'k6 reference documentation.'
+	// Create lambda/sub-a (should be included).
+	writeFile(t, afs, filepath.Join(versionRoot, "lambda", "_index.md"), `---
+title: 'Lambda'
+description: 'k6 lambda documentation.'
 weight: 100
 ---
 
-# Reference
+# Lambda
 `)
 
-	writeFile(t, afs, filepath.Join(versionRoot, "reference", "glossary.md"), `---
-title: 'Glossary'
+	writeFile(t, afs, filepath.Join(versionRoot, "lambda", "sub-a.md"), `---
+title: 'SubA'
 description: 'Technical terms used in k6.'
 weight: 07
 ---
 
-# Glossary
+# SubA
 
 What we talk about when we talk about k6.
 `)
 
-	// Create reference/archive.md (should be EXCLUDED — only glossary is included).
-	writeFile(t, afs, filepath.Join(versionRoot, "reference", "archive.md"), `---
-title: 'Archive'
-description: 'k6 archive command.'
+	// Create lambda/sub-b.md (should be EXCLUDED — only sub-a is included).
+	writeFile(t, afs, filepath.Join(versionRoot, "lambda", "sub-b.md"), `---
+title: 'SubB'
+description: 'k6 sub-b command.'
 weight: 10
 ---
 
-# Archive
+# SubB
 `)
 
-	// Create included extensions category.
-	writeFile(t, afs, filepath.Join(versionRoot, "extensions", "_index.md"), `---
-title: 'Extensions'
-description: 'k6 extensions.'
+	// Create included iota category.
+	writeFile(t, afs, filepath.Join(versionRoot, "iota", "_index.md"), `---
+title: 'Iota'
+description: 'k6 iota.'
 weight: 50
 ---
 
-# Extensions
+# Iota
 `)
 
 	// Create excluded categories.
-	writeFile(t, afs, filepath.Join(versionRoot, "get-started", "_index.md"), `---
-title: 'Get Started'
+	writeFile(t, afs, filepath.Join(versionRoot, "kappa", "_index.md"), `---
+title: 'Kappa'
 description: 'Getting started with k6.'
 weight: 01
 ---
 
-# Get Started
+# Kappa
 `)
 
 	return afs, root
@@ -264,16 +264,16 @@ func TestRunWithMockDocs(t *testing.T) {
 	// Check included sections exist.
 	expectedSlugs := []string{
 		"javascript-api",
-		"javascript-api/k6-http",
-		"javascript-api/k6-http/get",
-		"javascript-api/k6-http/post",
-		"using-k6",
-		"using-k6/checks",
-		"using-k6/thresholds",
-		"reference/glossary",
-		"reference/archive",
-		"extensions",
-		"get-started",
+		"javascript-api/k6-mod-a",
+		"javascript-api/k6-mod-a/fn-one",
+		"javascript-api/k6-mod-a/fn-two",
+		"alpha",
+		"alpha/topic-two",
+		"alpha/topic-three",
+		"lambda/sub-a",
+		"lambda/sub-b",
+		"iota",
+		"kappa",
 	}
 	for _, slug := range expectedSlugs {
 		if _, ok := bySlug[slug]; !ok {
@@ -298,38 +298,38 @@ func TestRunWithMockDocs(t *testing.T) {
 		requireSection(t, bySlug["javascript-api"], "JavaScript API", "javascript-api", true, 3)
 	})
 
-	t.Run("get metadata", func(t *testing.T) {
+	t.Run("fn-one metadata", func(t *testing.T) {
 		t.Parallel()
 
-		requireSection(t, bySlug["javascript-api/k6-http/get"], "get( url, [params] )", "javascript-api", false, 10)
+		requireSection(t, bySlug["javascript-api/k6-mod-a/fn-one"], "fnOne( url, [params] )", "javascript-api", false, 10)
 	})
 
 	// Verify children population.
-	t.Run("k6-http children", func(t *testing.T) {
+	t.Run("k6-mod-a children", func(t *testing.T) {
 		t.Parallel()
 
-		// get (weight 10) should come before post (weight 20).
-		requireChildren(t, bySlug["javascript-api/k6-http"],
-			"javascript-api/k6-http/get", "javascript-api/k6-http/post")
+		// fn-one (weight 10) should come before fn-two (weight 20).
+		requireChildren(t, bySlug["javascript-api/k6-mod-a"],
+			"javascript-api/k6-mod-a/fn-one", "javascript-api/k6-mod-a/fn-two")
 	})
 
 	t.Run("javascript-api children", func(t *testing.T) {
 		t.Parallel()
 
-		requireChildren(t, bySlug["javascript-api"], "javascript-api/k6-http")
+		requireChildren(t, bySlug["javascript-api"], "javascript-api/k6-mod-a")
 	})
 
-	t.Run("using-k6 children", func(t *testing.T) {
+	t.Run("alpha children", func(t *testing.T) {
 		t.Parallel()
 
-		// checks (weight 400) before thresholds (weight 500).
-		requireChildren(t, bySlug["using-k6"], "using-k6/checks", "using-k6/thresholds")
+		// topic-two (weight 400) before topic-three (weight 500).
+		requireChildren(t, bySlug["alpha"], "alpha/topic-two", "alpha/topic-three")
 	})
 
 	t.Run("leaf node has empty children", func(t *testing.T) {
 		t.Parallel()
 
-		requireChildren(t, bySlug["using-k6/checks"])
+		requireChildren(t, bySlug["alpha/topic-two"])
 	})
 }
 
@@ -378,16 +378,16 @@ func TestTransformedMarkdownContent(t *testing.T) {
 	t.Run("shared content resolved", func(t *testing.T) {
 		t.Parallel()
 
-		data, err := fsext.ReadFile(afs, filepath.Join(outputDir, "markdown", "javascript-api", "k6-http", "_index.md"))
+		data, err := fsext.ReadFile(afs, filepath.Join(outputDir, "markdown", "javascript-api", "k6-mod-a", "_index.md"))
 		if err != nil {
-			t.Fatalf("read k6-http _index.md: %v", err)
+			t.Fatalf("read k6-mod-a _index.md: %v", err)
 		}
 		content := string(data)
 
 		if strings.Contains(content, "docs/shared") {
 			t.Error("shared shortcode should be resolved")
 		}
-		if !strings.Contains(content, "k6/http module contains functionality") {
+		if !strings.Contains(content, "k6/mod-a module contains functionality") {
 			t.Error("shared content should be inlined")
 		}
 	})
@@ -395,16 +395,16 @@ func TestTransformedMarkdownContent(t *testing.T) {
 	t.Run("code tags preserved in bundle", func(t *testing.T) {
 		t.Parallel()
 
-		data, err := fsext.ReadFile(afs, filepath.Join(outputDir, "markdown", "javascript-api", "k6-http", "get.md"))
+		data, err := fsext.ReadFile(afs, filepath.Join(outputDir, "markdown", "javascript-api", "k6-mod-a", "fn-one.md"))
 		if err != nil {
-			t.Fatalf("read get.md: %v", err)
+			t.Fatalf("read fn-one.md: %v", err)
 		}
 		content := string(data)
 
 		if !strings.Contains(content, "{{< code >}}") {
 			t.Error("code shortcodes should be preserved in bundle (stripped at runtime)")
 		}
-		if !strings.Contains(content, "import http from 'k6/http'") {
+		if !strings.Contains(content, "import modA from 'k6/mod-a'") {
 			t.Error("code block content should be preserved")
 		}
 	})
@@ -412,9 +412,9 @@ func TestTransformedMarkdownContent(t *testing.T) {
 	t.Run("admonition preserved in bundle", func(t *testing.T) {
 		t.Parallel()
 
-		data, err := fsext.ReadFile(afs, filepath.Join(outputDir, "markdown", "using-k6", "checks.md"))
+		data, err := fsext.ReadFile(afs, filepath.Join(outputDir, "markdown", "alpha", "topic-two.md"))
 		if err != nil {
-			t.Fatalf("read checks.md: %v", err)
+			t.Fatalf("read topic-two.md: %v", err)
 		}
 		content := string(data)
 
@@ -426,16 +426,16 @@ func TestTransformedMarkdownContent(t *testing.T) {
 	t.Run("frontmatter preserved in bundle", func(t *testing.T) {
 		t.Parallel()
 
-		data, err := fsext.ReadFile(afs, filepath.Join(outputDir, "markdown", "using-k6", "thresholds.md"))
+		data, err := fsext.ReadFile(afs, filepath.Join(outputDir, "markdown", "alpha", "topic-three.md"))
 		if err != nil {
-			t.Fatalf("read thresholds.md: %v", err)
+			t.Fatalf("read topic-three.md: %v", err)
 		}
 		content := string(data)
 
-		if !strings.Contains(content, "title: 'Thresholds'") {
+		if !strings.Contains(content, "title: 'TopicThree'") {
 			t.Error("frontmatter should be preserved in bundle (stripped at runtime)")
 		}
-		if !strings.Contains(content, "# Thresholds") {
+		if !strings.Contains(content, "# TopicThree") {
 			t.Error("markdown heading should be preserved")
 		}
 	})
@@ -443,9 +443,9 @@ func TestTransformedMarkdownContent(t *testing.T) {
 	t.Run("version placeholder preserved in bundle", func(t *testing.T) {
 		t.Parallel()
 
-		data, err := fsext.ReadFile(afs, filepath.Join(outputDir, "markdown", "javascript-api", "k6-http", "get.md"))
+		data, err := fsext.ReadFile(afs, filepath.Join(outputDir, "markdown", "javascript-api", "k6-mod-a", "fn-one.md"))
 		if err != nil {
-			t.Fatalf("read get.md: %v", err)
+			t.Fatalf("read fn-one.md: %v", err)
 		}
 		content := string(data)
 
@@ -502,12 +502,12 @@ func TestSlugDerivation(t *testing.T) {
 		relPath string
 		want    string
 	}{
-		{"javascript-api/k6-http/_index.md", "javascript-api/k6-http"},
-		{"javascript-api/k6-http/get.md", "javascript-api/k6-http/get"},
-		{"using-k6/scenarios/_index.md", "using-k6/scenarios"},
-		{"using-k6/checks.md", "using-k6/checks"},
-		{"examples/_index.md", "examples"},
-		{"reference/glossary.md", "reference/glossary"},
+		{"javascript-api/k6-mod-a/_index.md", "javascript-api/k6-mod-a"},
+		{"javascript-api/k6-mod-a/fn-one.md", "javascript-api/k6-mod-a/fn-one"},
+		{"alpha/topic-one/_index.md", "alpha/topic-one"},
+		{"alpha/topic-two.md", "alpha/topic-two"},
+		{"beta/_index.md", "beta"},
+		{"lambda/sub-a.md", "lambda/sub-a"},
 	}
 
 	for _, tt := range tests {
@@ -528,10 +528,10 @@ func TestCategoryDerivation(t *testing.T) {
 		slug string
 		want string
 	}{
-		{"javascript-api/k6-http/get", "javascript-api"},
-		{"using-k6/checks", "using-k6"},
-		{"examples", "examples"},
-		{"reference/glossary", "reference"},
+		{"javascript-api/k6-mod-a/fn-one", "javascript-api"},
+		{"alpha/topic-two", "alpha"},
+		{"beta", "beta"},
+		{"lambda/sub-a", "lambda"},
 	}
 
 	for _, tt := range tests {
@@ -555,8 +555,8 @@ func TestParseFrontmatter(t *testing.T) {
 	}{
 		{
 			name:    "typical frontmatter",
-			content: "---\ntitle: 'Checks'\ndescription: 'Validate conditions.'\nweight: 400\n---\n\n# Checks",
-			want:    frontmatter{Title: "Checks", Description: "Validate conditions.", Weight: 400},
+			content: "---\ntitle: 'TopicTwo'\ndescription: 'Validate conditions.'\nweight: 400\n---\n\n# TopicTwo",
+			want:    frontmatter{Title: "TopicTwo", Description: "Validate conditions.", Weight: 400},
 		},
 		{
 			name:    "no frontmatter",
@@ -639,54 +639,54 @@ func TestPopulateChildren(t *testing.T) {
 	t.Parallel()
 
 	sections := []docs.Section{
-		{Slug: "using-k6", IsIndex: true, Weight: 1},
-		{Slug: "using-k6/checks", Weight: 400},
-		{Slug: "using-k6/thresholds", Weight: 200},
-		{Slug: "using-k6/scenarios", IsIndex: true, Weight: 300},
-		{Slug: "using-k6/scenarios/executors", IsIndex: true, Weight: 1},
-		{Slug: "using-k6/scenarios/executors/shared-iterations", Weight: 1},
+		{Slug: "alpha", IsIndex: true, Weight: 1},
+		{Slug: "alpha/topic-two", Weight: 400},
+		{Slug: "alpha/topic-three", Weight: 200},
+		{Slug: "alpha/topic-one", IsIndex: true, Weight: 300},
+		{Slug: "alpha/topic-one/executors", IsIndex: true, Weight: 1},
+		{Slug: "alpha/topic-one/executors/shared-iterations", Weight: 1},
 	}
 
 	populateChildren(sections)
 
-	// using-k6 should have checks, thresholds, scenarios as direct children.
-	// Sorted by weight: thresholds (200), scenarios (300), checks (400).
+	// alpha should have topic-two, topic-three, topic-one as direct children.
+	// Sorted by weight: topic-three (200), topic-one (300), topic-two (400).
 	parent := sections[0]
 	if len(parent.Children) != 3 {
-		t.Fatalf("using-k6 children: got %d, want 3", len(parent.Children))
+		t.Fatalf("alpha children: got %d, want 3", len(parent.Children))
 	}
-	if parent.Children[0] != "using-k6/thresholds" {
-		t.Errorf("Children[0] = %q, want %q", parent.Children[0], "using-k6/thresholds")
+	if parent.Children[0] != "alpha/topic-three" {
+		t.Errorf("Children[0] = %q, want %q", parent.Children[0], "alpha/topic-three")
 	}
-	if parent.Children[1] != "using-k6/scenarios" {
-		t.Errorf("Children[1] = %q, want %q", parent.Children[1], "using-k6/scenarios")
+	if parent.Children[1] != "alpha/topic-one" {
+		t.Errorf("Children[1] = %q, want %q", parent.Children[1], "alpha/topic-one")
 	}
-	if parent.Children[2] != "using-k6/checks" {
-		t.Errorf("Children[2] = %q, want %q", parent.Children[2], "using-k6/checks")
-	}
-
-	// using-k6/scenarios should have executors as only direct child.
-	scenarios := sections[3]
-	if len(scenarios.Children) != 1 {
-		t.Fatalf("scenarios children: got %d, want 1", len(scenarios.Children))
-	}
-	if scenarios.Children[0] != "using-k6/scenarios/executors" {
-		t.Errorf("Children[0] = %q, want %q", scenarios.Children[0], "using-k6/scenarios/executors")
+	if parent.Children[2] != "alpha/topic-two" {
+		t.Errorf("Children[2] = %q, want %q", parent.Children[2], "alpha/topic-two")
 	}
 
-	// using-k6/scenarios/executors should have shared-iterations.
+	// alpha/topic-one should have executors as only direct child.
+	topicOne := sections[3]
+	if len(topicOne.Children) != 1 {
+		t.Fatalf("topic-one children: got %d, want 1", len(topicOne.Children))
+	}
+	if topicOne.Children[0] != "alpha/topic-one/executors" {
+		t.Errorf("Children[0] = %q, want %q", topicOne.Children[0], "alpha/topic-one/executors")
+	}
+
+	// alpha/topic-one/executors should have shared-iterations.
 	executors := sections[4]
 	if len(executors.Children) != 1 {
 		t.Fatalf("executors children: got %d, want 1", len(executors.Children))
 	}
 
 	// Non-index leaf nodes should have empty (non-nil) children.
-	checks := sections[1]
-	if checks.Children == nil {
+	topicTwo := sections[1]
+	if topicTwo.Children == nil {
 		t.Error("leaf Children should be non-nil")
 	}
-	if len(checks.Children) != 0 {
-		t.Errorf("leaf Children count = %d, want 0", len(checks.Children))
+	if len(topicTwo.Children) != 0 {
+		t.Errorf("leaf Children count = %d, want 0", len(topicTwo.Children))
 	}
 }
 
@@ -699,17 +699,17 @@ func TestSlugCollisionPrefersIndex(t *testing.T) {
 	versionRoot := filepath.Join(root, "docs", "sources", "k6", version)
 
 	// Create a regular file and an _index.md that produce the same slug.
-	// javascript-api/k6-http/cookiejar.md  -> slug: javascript-api/k6-http/cookiejar
-	// javascript-api/k6-http/cookiejar/_index.md -> slug: javascript-api/k6-http/cookiejar
+	// javascript-api/k6-mod-a/child-a.md  -> slug: javascript-api/k6-mod-a/child-a
+	// javascript-api/k6-mod-a/child-a/_index.md -> slug: javascript-api/k6-mod-a/child-a
 	writeFile(t, afs, filepath.Join(versionRoot, "_index.md"), "---\ntitle: root\n---\n")
 	writeFile(t, afs, filepath.Join(versionRoot, "javascript-api", "_index.md"), "---\ntitle: 'JS API'\nweight: 1\n---\n")
-	writeFile(t, afs, filepath.Join(versionRoot, "javascript-api", "k6-http", "_index.md"), "---\ntitle: 'k6/http'\nweight: 1\n---\n")
-	writeFile(t, afs, filepath.Join(versionRoot, "javascript-api", "k6-http", "cookiejar.md"),
-		"---\ntitle: 'cookiejar function'\nweight: 10\n---\n\nA function.\n")
-	writeFile(t, afs, filepath.Join(versionRoot, "javascript-api", "k6-http", "cookiejar", "_index.md"),
-		"---\ntitle: 'CookieJar class'\nweight: 20\n---\n\nA class with children.\n")
-	writeFile(t, afs, filepath.Join(versionRoot, "javascript-api", "k6-http", "cookiejar", "set.md"),
-		"---\ntitle: 'set'\nweight: 1\n---\n\nSet a cookie.\n")
+	writeFile(t, afs, filepath.Join(versionRoot, "javascript-api", "k6-mod-a", "_index.md"), "---\ntitle: 'k6/mod-a'\nweight: 1\n---\n")
+	writeFile(t, afs, filepath.Join(versionRoot, "javascript-api", "k6-mod-a", "child-a.md"),
+		"---\ntitle: 'child-a function'\nweight: 10\n---\n\nA function.\n")
+	writeFile(t, afs, filepath.Join(versionRoot, "javascript-api", "k6-mod-a", "child-a", "_index.md"),
+		"---\ntitle: 'ChildA class'\nweight: 20\n---\n\nA class with children.\n")
+	writeFile(t, afs, filepath.Join(versionRoot, "javascript-api", "k6-mod-a", "child-a", "set.md"),
+		"---\ntitle: 'set'\nweight: 1\n---\n\nSet an item.\n")
 
 	outputDir := "/output-collision"
 	if err := run(version, root, outputDir, afs, io.Discard); err != nil {
@@ -727,7 +727,7 @@ func TestSlugCollisionPrefersIndex(t *testing.T) {
 	}
 
 	// Count how many sections have the colliding slug.
-	slug := "javascript-api/k6-http/cookiejar"
+	slug := "javascript-api/k6-mod-a/child-a"
 	var matches []docs.Section
 	for _, s := range idx.Sections {
 		if s.Slug == slug {
@@ -743,8 +743,8 @@ func TestSlugCollisionPrefersIndex(t *testing.T) {
 	if !matches[0].IsIndex {
 		t.Errorf("expected the _index.md version to win the slug collision, got IsIndex=false")
 	}
-	if matches[0].Title != "CookieJar class" {
-		t.Errorf("Title = %q, want %q", matches[0].Title, "CookieJar class")
+	if matches[0].Title != "ChildA class" {
+		t.Errorf("Title = %q, want %q", matches[0].Title, "ChildA class")
 	}
 }
 

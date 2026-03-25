@@ -29,7 +29,7 @@ func (env *docsEnv) readAndTransform(relPath string) string {
 // childName returns the short name of a child relative to its parent.
 // If the child slug starts with parentSlug+"/", the prefix is stripped.
 // Then, if the remaining name starts with the parent's last segment + "-",
-// that redundant prefix is also stripped (e.g. cookiejar-clear → clear).
+// that redundant prefix is also stripped (e.g. parent-child → child).
 func childName(childSlug, parentSlug string) string {
 	if strings.HasPrefix(childSlug, parentSlug+"/") {
 		name := childSlug[len(parentSlug)+1:]
@@ -172,7 +172,7 @@ func searchResults(idx *Index, args []string, readContent func(string) string) [
 
 // printSearch prints search results as an indented tree, no descriptions.
 // Args are normalized and resolved through the same rules as docs navigation
-// so that e.g. "browser page" and "k6-browser/page" produce the same results.
+// so that e.g. "mod-b leaf" and "k6-mod-b/leaf" produce the same results.
 func printSearch(env *docsEnv, w io.Writer, idx *Index, args []string) {
 	args = normalizeArgs(args)
 

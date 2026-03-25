@@ -9,14 +9,14 @@ stderr 'topic not found'
 
 # --version and --cache-dir inherited by search subcommand
 k6-docs --cache-dir $WORK/cache --version v0.55.x search k6
-stdout '- examples'
+stdout '- k6-mod-a'
 
 # --depth 1 shows flat list (same as default)
 k6-docs --cache-dir $WORK/cache --version v0.55.x --depth 1
 stdout '- javascript-api'
-! stdout '  - k6-http'
+! stdout '  - k6-mod-a'
 
 # --depth 3 shows grandchildren
 k6-docs --cache-dir $WORK/cache --version v0.55.x --depth 3
-stdout '  - k6-http'
-stdout '    - get'
+stdout '  - k6-mod-a'
+stdout '    - fn-one'

@@ -1,8 +1,0 @@
----
-title: 'Scenarios'
----
-# Scenarios
-
-Scenarios let you configure how your test executes.
-
-See the Scenarios documentation for details.

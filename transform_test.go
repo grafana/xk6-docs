@@ -66,8 +66,8 @@ func TestPrepareTransform_ResolveShared(t *testing.T) {
 	t.Parallel()
 
 	shared := map[string]string{
-		"javascript-api/k6-http.md": "---\ntitle: shared\n---\n\nThe k6/http module handles HTTP.",
-		"preview-feature.md":        "---\ntitle: preview\n---\n\nThis is a preview feature.",
+		"javascript-api/k6-mod-a.md": "---\ntitle: shared\n---\n\nThe k6/mod-a module handles requests.",
+		"preview-feature.md":         "---\ntitle: preview\n---\n\nThis is a preview feature.",
 	}
 
 	tests := []struct {
@@ -77,8 +77,8 @@ func TestPrepareTransform_ResolveShared(t *testing.T) {
 	}{
 		{
 			name:    "resolve shared shortcode",
-			content: `{{< docs/shared source="k6" lookup="javascript-api/k6-http.md" version="<K6_VERSION>" >}}`,
-			want:    "\nThe k6/http module handles HTTP.",
+			content: `{{< docs/shared source="k6" lookup="javascript-api/k6-mod-a.md" version="<K6_VERSION>" >}}`,
+			want:    "\nThe k6/mod-a module handles requests.",
 		},
 		{
 			name:    "resolve shared shortcode with different spacing",
@@ -92,8 +92,8 @@ func TestPrepareTransform_ResolveShared(t *testing.T) {
 		},
 		{
 			name:    "shared content inline with surrounding text",
-			content: "Before\n\n{{< docs/shared source=\"k6\" lookup=\"javascript-api/k6-http.md\" version=\"<K6_VERSION>\" >}}\n\nAfter",
-			want:    "Before\n\n\nThe k6/http module handles HTTP.\n\nAfter",
+			content: "Before\n\n{{< docs/shared source=\"k6\" lookup=\"javascript-api/k6-mod-a.md\" version=\"<K6_VERSION>\" >}}\n\nAfter",
+			want:    "Before\n\n\nThe k6/mod-a module handles requests.\n\nAfter",
 		},
 	}
 
@@ -102,7 +102,7 @@ func TestPrepareTransform_ResolveShared(t *testing.T) {
 			t.Parallel()
 
 			got := PrepareTransform(tt.content, shared)
-			if !strings.Contains(got, "k6/http module handles HTTP") && tt.name == "resolve shared shortcode" {
+			if !strings.Contains(got, "k6/mod-a module handles requests") && tt.name == "resolve shared shortcode" {
 				t.Errorf("expected shared content to be inlined, got: %q", got)
 			}
 			if strings.Contains(got, "docs/shared") {
@@ -308,15 +308,15 @@ func TestTransform_ReplaceVersion(t *testing.T) {
 	}{
 		{
 			name:    "replace version in bare URL",
-			content: "Visit https://grafana.com/docs/k6/<K6_VERSION>/extensions/explore for extensions.",
+			content: "Visit https://grafana.com/docs/k6/<K6_VERSION>/iota/explore for details.",
 			version: "v1.5.x",
-			want:    "Visit https://grafana.com/docs/k6/v1.5.x/extensions/explore for extensions.",
+			want:    "Visit https://grafana.com/docs/k6/v1.5.x/iota/explore for details.",
 		},
 		{
 			name:    "replace version in external link then strip to text",
-			content: "[extensions](https://grafana.com/docs/k6/<K6_VERSION>/extensions/explore)",
+			content: "[details](https://grafana.com/docs/k6/<K6_VERSION>/iota/explore)",
 			version: "v1.5.x",
-			want:    "extensions",
+			want:    "details",
 		},
 	}
 
@@ -342,52 +342,52 @@ func TestTransform_ConvertInternalLinks(t *testing.T) {
 	}{
 		{
 			name:    "internal JS API link becomes plain text",
-			content: "[batch( requests )](https://grafana.com/docs/k6/v1.5.x/javascript-api/k6-http/batch)",
+			content: "[batch( requests )](https://grafana.com/docs/k6/v1.5.x/javascript-api/k6-mod-a/batch)",
 			want:    "batch( requests )",
 		},
 		{
-			name:    "internal using-k6 link becomes plain text",
-			content: "[thresholds](https://grafana.com/docs/k6/v1.5.x/using-k6/thresholds)",
-			want:    "thresholds",
+			name:    "internal alpha link becomes plain text",
+			content: "[topic-three](https://grafana.com/docs/k6/v1.5.x/alpha/topic-three)",
+			want:    "topic-three",
 		},
 		{
 			name:    "internal link with anchor becomes plain text",
-			content: "[URL Grouping](https://grafana.com/docs/k6/v1.5.x/using-k6/http-requests#url-grouping)",
+			content: "[URL Grouping](https://grafana.com/docs/k6/v1.5.x/alpha/debug-feat#url-grouping)",
 			want:    "URL Grouping",
 		},
 		{
 			name:    "internal link with trailing slash becomes plain text",
-			content: "[scenarios](https://grafana.com/docs/k6/v1.5.x/using-k6/scenarios/)",
-			want:    "scenarios",
+			content: "[topic-one](https://grafana.com/docs/k6/v1.5.x/alpha/topic-one/)",
+			want:    "topic-one",
 		},
 		{
 			name:    "excluded category link stripped to text",
-			content: "[Build a k6 binary](https://grafana.com/docs/k6/v1.5.x/extensions/build-k6-binary-using-go)",
+			content: "[Build a k6 binary](https://grafana.com/docs/k6/v1.5.x/iota/build-k6-binary-using-go)",
 			want:    "Build a k6 binary",
 		},
 		{
-			name:    "get-started link stripped to text",
-			content: "[Install k6](https://grafana.com/docs/k6/v1.5.x/get-started/installation/)",
+			name:    "kappa link stripped to text",
+			content: "[Install k6](https://grafana.com/docs/k6/v1.5.x/kappa/sub-one/)",
 			want:    "Install k6",
 		},
 		{
-			name:    "set-up link stripped to text",
-			content: "[Set up](https://grafana.com/docs/k6/v1.5.x/set-up/something)",
-			want:    "Set up",
+			name:    "delta link stripped to text",
+			content: "[Delta](https://grafana.com/docs/k6/v1.5.x/delta/something)",
+			want:    "Delta",
 		},
 		{
 			name:    "multiple links in one line",
-			content: "See [metrics](https://grafana.com/docs/k6/v1.5.x/using-k6/metrics) and [checks](https://grafana.com/docs/k6/v1.5.x/using-k6/checks).",
-			want:    "See metrics and checks.",
+			content: "See [metrics](https://grafana.com/docs/k6/v1.5.x/alpha/metrics) and [topic-two](https://grafana.com/docs/k6/v1.5.x/alpha/topic-two).",
+			want:    "See metrics and topic-two.",
 		},
 		{
 			name:    "link text with brackets (optional params)",
-			content: "[get( url, [params] )](https://grafana.com/docs/k6/v1.5.x/javascript-api/k6-http/get)",
-			want:    "get( url, [params] )",
+			content: "[fnOne( url, [params] )](https://grafana.com/docs/k6/v1.5.x/javascript-api/k6-mod-a/fn-one)",
+			want:    "fnOne( url, [params] )",
 		},
 		{
 			name:    "link text with nested brackets",
-			content: "[check(selector[, options])](https://grafana.com/docs/k6/v1.5.x/javascript-api/k6-browser/page/check/)",
+			content: "[check(selector[, options])](https://grafana.com/docs/k6/v1.5.x/javascript-api/k6-mod-b/leaf-one/check/)",
 			want:    "check(selector[, options])",
 		},
 		{
@@ -397,17 +397,17 @@ func TestTransform_ConvertInternalLinks(t *testing.T) {
 		},
 		{
 			name:    "all included categories become plain text",
-			content: "[a](https://grafana.com/docs/k6/v1.5.x/javascript-api/foo) [b](https://grafana.com/docs/k6/v1.5.x/using-k6/bar) [c](https://grafana.com/docs/k6/v1.5.x/using-k6-browser/baz) [d](https://grafana.com/docs/k6/v1.5.x/testing-guides/qux) [e](https://grafana.com/docs/k6/v1.5.x/examples/quux) [f](https://grafana.com/docs/k6/v1.5.x/results-output/corge)",
+			content: "[a](https://grafana.com/docs/k6/v1.5.x/javascript-api/foo) [b](https://grafana.com/docs/k6/v1.5.x/alpha/bar) [c](https://grafana.com/docs/k6/v1.5.x/gamma/baz) [d](https://grafana.com/docs/k6/v1.5.x/delta/qux) [e](https://grafana.com/docs/k6/v1.5.x/beta/quux) [f](https://grafana.com/docs/k6/v1.5.x/theta/corge)",
 			want:    "a b c d e f",
 		},
 		{
-			name:    "reference/glossary link becomes plain text",
-			content: "[g](https://grafana.com/docs/k6/v1.5.x/reference/glossary)",
+			name:    "lambda/sub-a link becomes plain text",
+			content: "[g](https://grafana.com/docs/k6/v1.5.x/lambda/sub-a)",
 			want:    "g",
 		},
 		{
-			name:    "reference non-glossary link stripped by catch-all",
-			content: "[g](https://grafana.com/docs/k6/v1.5.x/reference/grault)",
+			name:    "lambda non-sub-a link stripped by catch-all",
+			content: "[g](https://grafana.com/docs/k6/v1.5.x/lambda/grault)",
 			want:    "g",
 		},
 	}
@@ -434,8 +434,8 @@ func TestTransform_StripMarkdownLinks(t *testing.T) {
 	}{
 		{
 			name:    "simple link",
-			content: "[jslib](https://example.com)",
-			want:    "jslib",
+			content: "[lib-c](https://example.com)",
+			want:    "lib-c",
 		},
 		{
 			name:    "link with path",
@@ -521,8 +521,8 @@ func TestTransform_StripHTMLComments(t *testing.T) {
 func TestTransform_StripFrontmatter(t *testing.T) {
 	t.Parallel()
 
-	content := "---\ntitle: 'Checks'\ndescription: 'Some description.'\nweight: 400\n---\n\n# Checks\n\nContent here."
-	want := "\n# Checks\n\nContent here."
+	content := "---\ntitle: 'TopicTwo'\ndescription: 'Some description.'\nweight: 400\n---\n\n# TopicTwo\n\nContent here."
+	want := "\n# TopicTwo\n\nContent here."
 
 	got := Transform(content, "v1.0.0")
 	if got != want {
@@ -577,32 +577,32 @@ func TestTransform_NormalizeWhitespace(t *testing.T) {
 	}
 }
 
-func TestTransform_EndToEnd_ChecksMd(t *testing.T) {
+func TestTransform_EndToEnd_TopicTwoMd(t *testing.T) {
 	t.Parallel()
 
-	// Simulate the checks.md file from k6-docs (simplified but realistic).
+	// Simulate a topic-two.md file (simplified but realistic).
 	input := `---
-title: 'Checks'
-description: 'Checks are like asserts but differ in that they do not halt the execution.'
+title: 'TopicTwo'
+description: 'TopicTwo items are like asserts but differ in that they do not halt the execution.'
 weight: 400
 ---
 
-# Checks
+# TopicTwo
 
-Checks validate boolean conditions in your test.
+TopicTwo items validate boolean conditions in your test.
 
-Each check creates a [rate metric](https://grafana.com/docs/k6/<K6_VERSION>/using-k6/metrics).
+Each item creates a [rate metric](https://grafana.com/docs/k6/<K6_VERSION>/alpha/metrics).
 
-## Check for HTTP response code
+## Check for response code
 
 {{< code >}}
 
 ` + "```javascript" + `
 import { check } from 'k6';
-import http from 'k6/http';
+import modA from 'k6/mod-a';
 
 export default function () {
-  const res = http.get('http://test.k6.io/');
+  const res = modA.fnOne('http://test.example.com/');
   check(res, {
     'is status 200': (r) => r.status === 200,
   });
@@ -613,8 +613,8 @@ export default function () {
 
 {{< admonition type="note" >}}
 
-When a check fails, the script will continue executing successfully and will not return a 'failed' exit status.
-If you need the whole test to fail based on the results of a check, you have to combine checks with thresholds.
+When an item fails, the script will continue executing successfully and will not return a 'failed' exit status.
+If you need the whole test to fail based on the results of an item, you have to combine items with topic-three.
 
 {{< /admonition >}}
 
@@ -627,7 +627,7 @@ If you need the whole test to fail based on the results of a check, you have to 
 	got := Transform(input, "v1.5.x")
 
 	// Should not contain frontmatter.
-	if strings.Contains(got, "title: 'Checks'") {
+	if strings.Contains(got, "title: 'TopicTwo'") {
 		t.Error("frontmatter should be stripped")
 	}
 
@@ -677,23 +677,23 @@ func TestTransform_EndToEnd_SharedContent(t *testing.T) {
 	t.Parallel()
 
 	shared := map[string]string{
-		"javascript-api/k6-http.md": "---\ntitle: 'k6/http shared'\n---\n\nThe k6/http module contains functionality for performing HTTP transactions.\n\n| Method | Description |\n|--------|-------------|\n| get    | GET request |",
+		"javascript-api/k6-mod-a.md": "---\ntitle: 'k6/mod-a shared'\n---\n\nThe k6/mod-a module contains functionality for performing requests.\n\n| Method | Description |\n|--------|-------------|\n| fnOne  | First function |",
 	}
 
 	input := `---
-title: 'k6/http'
-description: 'The k6/http module contains functionality for performing HTTP transactions.'
+title: 'k6/mod-a'
+description: 'The k6/mod-a module contains functionality for performing requests.'
 weight: 09
 ---
 
-# k6/http
+# k6/mod-a
 
-{{< docs/shared source="k6" lookup="javascript-api/k6-http.md" version="<K6_VERSION>" >}}`
+{{< docs/shared source="k6" lookup="javascript-api/k6-mod-a.md" version="<K6_VERSION>" >}}`
 
 	prepared := PrepareTransform(input, shared)
 	got := Transform(prepared, "v1.5.x")
 
-	if strings.Contains(got, "title: 'k6/http'") {
+	if strings.Contains(got, "title: 'k6/mod-a'") {
 		t.Error("frontmatter should be stripped")
 	}
 
@@ -701,32 +701,32 @@ weight: 09
 		t.Error("shared shortcode should be resolved")
 	}
 
-	if !strings.Contains(got, "The k6/http module contains functionality") {
+	if !strings.Contains(got, "The k6/mod-a module contains functionality") {
 		t.Error("shared content should be inlined")
 	}
 
-	if !strings.Contains(got, "| get    | GET request |") {
+	if !strings.Contains(got, "| fnOne  | First function |") {
 		t.Error("shared content table should be inlined")
 	}
 
 	// The shared content's own frontmatter should be stripped.
-	if strings.Contains(got, "title: 'k6/http shared'") {
+	if strings.Contains(got, "title: 'k6/mod-a shared'") {
 		t.Error("shared content frontmatter should be stripped")
 	}
 }
 
-func TestTransform_EndToEnd_ScenariosMd(t *testing.T) {
+func TestTransform_EndToEnd_TopicOneMd(t *testing.T) {
 	t.Parallel()
 
 	input := `---
-title: Scenarios
-description: 'Scenarios configure how VUs and iteration schedules.'
+title: TopicOne
+description: 'TopicOne items configure how VUs and iteration schedules.'
 weight: 1500
 ---
 
-# Scenarios
+# TopicOne
 
-Scenarios configure how VUs and iteration schedules in granular detail.
+TopicOne items configure how VUs and iteration schedules in granular detail.
 
 {{< code >}}
 
@@ -734,8 +734,8 @@ Scenarios configure how VUs and iteration schedules in granular detail.
 
 ` + "```javascript" + `
 export const options = {
-  scenarios: {
-    example_scenario: {
+  topicOne: {
+    example_item: {
       executor: 'shared-iterations',
     },
   },
@@ -744,9 +744,9 @@ export const options = {
 
 {{< /code >}}
 
-## Scenario executors
+## TopicOne executors
 
-See [open vs closed](https://grafana.com/docs/k6/<K6_VERSION>/using-k6/scenarios/concepts/open-vs-closed).
+See [open vs closed](https://grafana.com/docs/k6/<K6_VERSION>/alpha/topic-one/concepts/open-vs-closed).
 
 {{< section >}}
 
@@ -761,7 +761,7 @@ running (00m12.8s), 00/20 VUs
 	got := Transform(input, "v1.5.x")
 
 	// Frontmatter gone.
-	if strings.Contains(got, "title: Scenarios") {
+	if strings.Contains(got, "title: TopicOne") {
 		t.Error("frontmatter should be stripped")
 	}
 

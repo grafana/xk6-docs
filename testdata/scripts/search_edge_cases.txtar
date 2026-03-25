@@ -3,12 +3,12 @@ k6-docs --cache-dir $WORK/cache --version v0.55.x search zzzznotfound
 cmp stdout golden-no-results.txt
 
 # Multiple words joined by spaces
-k6-docs --cache-dir $WORK/cache --version v0.55.x search WebSocket example content
-stdout 'examples'
+k6-docs --cache-dir $WORK/cache --version v0.55.x search TopicTwo content
+stdout 'beta'
 
 # Normalized match: spaces/dashes ignored
-k6-docs --cache-dir $WORK/cache --version v0.55.x search cookiejar
-stdout 'k6-http'
+k6-docs --cache-dir $WORK/cache --version v0.55.x search child-a
+stdout 'k6-mod-a'
 
 # bare javascript-api excluded from grouping
 k6-docs --cache-dir $WORK/cache --version v0.55.x search k6
@@ -18,7 +18,6 @@ cmp stdout golden-k6.txt
 -- golden-no-results.txt --
 (no results)
 -- golden-k6.txt --
-- examples
-- k6-http
-- k6-jslib
-- using-k6
+- k6-lib-c
+- k6-mod-a
+- k6-mod-b

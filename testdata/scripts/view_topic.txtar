@@ -1,49 +1,49 @@
 # Section with children shows subtopics footer
-k6-docs --cache-dir $WORK/cache --version v0.55.x http
-cmp stdout golden-http.txt
+k6-docs --cache-dir $WORK/cache --version v0.55.x mod-a
+cmp stdout golden-mod-a.txt
 
 # Leaf section: no subtopics footer, frontmatter stripped
-k6-docs --cache-dir $WORK/cache --version v0.55.x http get
-cmp stdout golden-http-get.txt
+k6-docs --cache-dir $WORK/cache --version v0.55.x mod-a fn-one
+cmp stdout golden-mod-a-fn-one.txt
 ! stdout '---'
 ! stdout 'title:'
 
-# Child names strip parent prefix (cookiejar-clear -> clear)
-k6-docs --cache-dir $WORK/cache --version v0.55.x http cookiejar
+# Child names strip parent prefix (child-a-clear -> clear)
+k6-docs --cache-dir $WORK/cache --version v0.55.x mod-a child-a
 stdout '- clear'
 
 # Non-JS-API usage hint with slug path
-k6-docs --cache-dir $WORK/cache --version v0.55.x using-k6
-stdout 'k6 x docs using-k6/'
+k6-docs --cache-dir $WORK/cache --version v0.55.x alpha
+stdout 'k6 x docs alpha/'
 
 # Missing markdown file: section appears blank (no error shown to user).
-rm $WORK/cache/markdown/testing-guides/_index.md
-k6-docs --cache-dir $WORK/cache --version v0.55.x testing-guides
+rm $WORK/cache/markdown/gamma/_index.md
+k6-docs --cache-dir $WORK/cache --version v0.55.x gamma
 ! stderr 'error'
 ! stderr 'not found'
 
--- golden-http.txt --
-# k6/http
+-- golden-mod-a.txt --
+# k6/mod-a
 
-The HTTP module provides functionality for making HTTP requests.
+The mod-a module.
 
-> **Note:** HTTP/2 is supported by default since k6 v0.55.x.
+> **Note:** Feature X is supported by default since k6 v0.55.x.
 
 ---
-**http subtopics:**
-- get
-- post
-- cookiejar
-- get
+**mod-a subtopics:**
+- fn-one
+- fn-two
+- child-a
+- fn-one
 
-> Example: `k6 x docs http/<subtopic>`
--- golden-http-get.txt --
-## http.get(url, [params])
+> Example: `k6 x docs mod-a/<subtopic>`
+-- golden-mod-a-fn-one.txt --
+## modA.fnOne(url, [params])
 
-Make an HTTP GET request.
+Perform a fn-one operation.
 
-import http from 'k6/http';
+import modA from 'k6/mod-a';
 
 export default function () {
-  const res = http.get('https://test-api.k6.io/');
+  const res = modA.fnOne('https://test.example.com/');
 }

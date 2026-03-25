@@ -2,14 +2,6 @@ package docs
 
 import "strings"
 
-// Resolve converts CLI args into a canonical documentation slug.
-// It always assumes the k6- prefix for JS API shortcuts.
-// Use [ResolveWithLookup] when an index is available to handle
-// slugs that don't carry the k6- prefix (e.g. jslib, crypto).
-func Resolve(args []string) string {
-	return ResolveWithLookup(args, nil)
-}
-
 // ResolveWithLookup converts CLI args into a canonical documentation slug.
 // When exists is non-nil, it disambiguates javascript-api children that
 // may or may not carry the k6- prefix.
@@ -47,8 +39,10 @@ func ResolveWithLookup(args []string, exists func(string) bool) string {
 
 	var slug string
 
-	if isCategory(args[0]) {
-		slug = strings.Join(args, "/")
+	direct := strings.Join(args, "/")
+	firstSeg, _, _ := strings.Cut(args[0], "/")
+	if exists != nil && (exists(direct) || exists(firstSeg)) {
+		slug = direct
 	} else {
 		// JS API module shortcut: strip k6- prefix (if present) and
 		// build the base javascript-api/ slug. The k6- prefix fallback
@@ -93,7 +87,7 @@ func withK6Prefix(slug string, exists func(string) bool) string {
 
 // withParentFallback retries a slug by prepending the parent segment name
 // to the last segment. This handles children whose actual slug carries a
-// redundant parent prefix (e.g. cookiejar/cookiejar-clear).
+// redundant parent prefix (e.g. parent/parent-child).
 func withParentFallback(slug string, exists func(string) bool) string {
 	if exists == nil || exists(slug) {
 		return slug

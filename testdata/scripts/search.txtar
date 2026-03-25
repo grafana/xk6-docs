@@ -1,18 +1,18 @@
 # Title/description match
-k6-docs --cache-dir $WORK/cache --version v0.55.x search Scenarios
-cmp stdout golden-scenarios.txt
+k6-docs --cache-dir $WORK/cache --version v0.55.x search guide
+cmp stdout golden-guide.txt
 
 # Description match grouped by JS API module
-k6-docs --cache-dir $WORK/cache --version v0.55.x search 'GET request'
-cmp stdout golden-get-request.txt
+k6-docs --cache-dir $WORK/cache --version v0.55.x search 'fn-one operation'
+cmp stdout golden-fn-one-operation.txt
 
 # Multi-group sorted alphabetically
 k6-docs --cache-dir $WORK/cache --version v0.55.x search k6
 cmp stdout golden-k6.txt
 
 # Body content match
-k6-docs --cache-dir $WORK/cache --version v0.55.x search 'WebSocket example content'
-stdout 'examples'
+k6-docs --cache-dir $WORK/cache --version v0.55.x search 'TopicTwo content'
+stdout 'beta'
 
 # No results
 k6-docs --cache-dir $WORK/cache --version v0.55.x search zzzznotfound
@@ -22,13 +22,12 @@ stdout '\(no results\)'
 ! k6-docs --cache-dir $WORK/cache --version v0.55.x search
 stderr 'requires at least 1 arg'
 
--- golden-scenarios.txt --
-- testing-guides
-- using-k6
--- golden-get-request.txt --
-- k6-http
+-- golden-guide.txt --
+- alpha
+- gamma
+-- golden-fn-one-operation.txt --
+- k6-mod-a
 -- golden-k6.txt --
-- examples
-- k6-http
-- k6-jslib
-- using-k6
+- k6-lib-c
+- k6-mod-a
+- k6-mod-b

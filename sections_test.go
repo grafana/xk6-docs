@@ -318,11 +318,11 @@ func TestSearchGroupKey(t *testing.T) {
 		slug string
 		want string
 	}{
-		{slug: "javascript-api/k6-http/get", want: "k6-http"},
-		{slug: "javascript-api/k6-http", want: "k6-http"},
-		{slug: "using-k6/scenarios", want: "using-k6"},
+		{slug: "javascript-api/k6-mod-a/fn-one", want: "k6-mod-a"},
+		{slug: "javascript-api/k6-mod-a", want: "k6-mod-a"},
+		{slug: "alpha/topic-one", want: "alpha"},
 		{slug: "javascript-api", want: "javascript-api"},
-		{slug: "results", want: "results"},
+		{slug: "theta", want: "theta"},
 	}
 
 	for _, tt := range tests {

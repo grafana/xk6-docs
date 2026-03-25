@@ -46,7 +46,7 @@ func TestRenderIntegration(t *testing.T) {
 
 	cmd := newCmd(gs)
 	cmd.SetOut(&cmdBuf)
-	cmd.SetArgs([]string{"--cache-dir", cacheDir, "--version", "v0.55.x", "http", "get"})
+	cmd.SetArgs([]string{"--cache-dir", cacheDir, "--version", "v0.55.x", "mod-a", "fn-one"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("cmd.Execute: %v", err)
@@ -54,7 +54,7 @@ func TestRenderIntegration(t *testing.T) {
 
 	// TTY mode: rendered output goes to gs.Stdout.Writer (stdoutBuf).
 	got := stdoutBuf.String()
-	if !strings.Contains(got, "http.get") {
+	if !strings.Contains(got, "modA.fnOne") {
 		t.Errorf("expected topic content in rendered output, got: %s", got)
 	}
 	if !strings.Contains(got, "\x1b[") {
@@ -75,14 +75,14 @@ func TestRenderSkippedWhenNoColor(t *testing.T) {
 
 	cmd := newCmd(gs)
 	cmd.SetOut(&cmdBuf)
-	cmd.SetArgs([]string{"--cache-dir", cacheDir, "--version", "v0.55.x", "http", "get"})
+	cmd.SetArgs([]string{"--cache-dir", cacheDir, "--version", "v0.55.x", "mod-a", "fn-one"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("cmd.Execute: %v", err)
 	}
 
 	// NoColor: raw output goes to cmd buffer, not rendered.
-	if !strings.Contains(cmdBuf.String(), "http.get(url)") {
+	if !strings.Contains(cmdBuf.String(), "modA.fnOne(url)") {
 		t.Errorf("expected raw output in cmd buffer, got: %s", cmdBuf.String())
 	}
 	if stdoutBuf.Len() > 0 {
@@ -102,14 +102,14 @@ func TestRenderSkippedWhenNonTTY(t *testing.T) {
 
 	cmd := newCmd(gs)
 	cmd.SetOut(&cmdBuf)
-	cmd.SetArgs([]string{"--cache-dir", cacheDir, "--version", "v0.55.x", "http", "get"})
+	cmd.SetArgs([]string{"--cache-dir", cacheDir, "--version", "v0.55.x", "mod-a", "fn-one"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("cmd.Execute: %v", err)
 	}
 
 	// Non-TTY: raw output goes to cmd buffer.
-	if !strings.Contains(cmdBuf.String(), "http.get(url)") {
+	if !strings.Contains(cmdBuf.String(), "modA.fnOne(url)") {
 		t.Errorf("expected raw output in cmd buffer, got: %s", cmdBuf.String())
 	}
 	if stdoutBuf.Len() > 0 {
