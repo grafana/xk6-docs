@@ -7,8 +7,8 @@ import (
 )
 
 // renderMarkdown renders markdown content with ANSI styling for terminal display.
-func renderMarkdown(w io.Writer, content string) error {
-	r, err := glamour.NewTermRenderer(glamour.WithStylePath("dark"))
+func renderMarkdown(w io.Writer, content string, width int) error {
+	r, err := glamour.NewTermRenderer(glamour.WithStylePath("dark"), glamour.WithWordWrap(width))
 	if err != nil {
 		return err
 	}

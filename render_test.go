@@ -15,7 +15,7 @@ func TestRenderMarkdown(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
-		if err := renderMarkdown(&buf, input); err != nil {
+		if err := renderMarkdown(&buf, input, 80); err != nil {
 			t.Fatalf("renderMarkdown: %v", err)
 		}
 		got := buf.String()
@@ -31,6 +31,29 @@ func TestRenderMarkdown(t *testing.T) {
 			t.Errorf("expected 'bold' in output, got: %q", got)
 		}
 	})
+}
+
+func TestRenderMarkdownRespectsWidth(t *testing.T) {
+	t.Parallel()
+
+	// A long line that should wrap differently at different widths.
+	input := "# Title\n\n" + strings.Repeat("word ", 30) + "\n"
+
+	var narrow, wide bytes.Buffer
+	if err := renderMarkdown(&narrow, input, 40); err != nil {
+		t.Fatalf("renderMarkdown narrow: %v", err)
+	}
+	if err := renderMarkdown(&wide, input, 120); err != nil {
+		t.Fatalf("renderMarkdown wide: %v", err)
+	}
+
+	// Narrow render should produce more lines than wide render.
+	narrowLines := strings.Count(narrow.String(), "\n")
+	wideLines := strings.Count(wide.String(), "\n")
+	if narrowLines <= wideLines {
+		t.Errorf("expected narrow (%d cols) to have more lines than wide (%d cols): %d vs %d",
+			40, 120, narrowLines, wideLines)
+	}
 }
 
 func TestRenderIntegration(t *testing.T) {

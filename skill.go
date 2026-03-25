@@ -103,7 +103,7 @@ func runSkill(afs fsext.Fs, w io.Writer, isTTY bool, binaryPath string, args []s
 	if len(args) == 0 {
 		table := skillHelpTable()
 		if isTTY {
-			return renderMarkdown(w, table)
+			return renderMarkdown(w, table, 80)
 		}
 		_, err := io.WriteString(w, table)
 		return err
