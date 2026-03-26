@@ -1,0 +1,43 @@
+name: Bundle Sync
+
+on:
+  schedule:
+    - cron: '3 */3 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Find versions to build
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSIONS=$(.github/scripts/sync.sh)
+          echo "Versions to build: ${VERSIONS:-none}"
+          echo "versions=$VERSIONS" >> "$GITHUB_OUTPUT"
+      - name: Build bundles
+        if: steps.check.outputs.versions != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sudo apt-get update && sudo apt-get install -y zstd
+          git clone --depth 1 https://github.com/grafana/k6-docs.git /tmp/k6-docs
+
+          for VERSION in ${{ steps.check.outputs.versions }}; do
+            echo "=== Building $VERSION ==="
+            rm -rf dist
+            go run ./cmd/prepare --k6-version="$VERSION" --k6-docs-path=/tmp/k6-docs --output-dir=dist
+            BUNDLE="docs-${VERSION}.tar.zst"
+            tar -cf - -C dist . | zstd --ultra -22 -o "$BUNDLE"
+
+            gh release delete-asset doc-bundles "$BUNDLE" --yes 2>/dev/null || true
+            gh release upload doc-bundles "$BUNDLE"
+
+            echo "=== Done: $BUNDLE ==="
+          done
