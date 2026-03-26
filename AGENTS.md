@@ -1,6 +1,7 @@
 ## RULES
 1. Update this file concisely whenever features are added, removed, or changed.
 2. Update the `features.md` file when user-facing features are added, removed, or changed.
+3. Read `history.md` for past incidents and lessons learned.
 4. Never take easy shortcuts or chase after easy wins. Execute what's asked for.
 5. Make the minimal change that delivers the new feature or fixes the bug.
 3. Use TDD: write a minimal test, fail it, write a minimal code to pass it. Repeat.
