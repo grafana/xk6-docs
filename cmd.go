@@ -147,7 +147,8 @@ func prepareRun(gs *state.GlobalState, cmd *cobra.Command, opts *docsOpts) (*run
 				pagerCmd = "less -r"
 			}
 			parts := strings.Split(pagerCmd, " ")
-			c := exec.CommandContext(cmd.Context(), parts[0], parts[1:]...) //nolint:gosec // user's $PAGER
+			// pagerCmd is the user's $PAGER env var; intentionally user-controlled.
+			c := exec.CommandContext(cmd.Context(), parts[0], parts[1:]...) // #nosec G204
 			c.Stdout = gs.Stdout.Writer
 			c.Stderr = gs.Stderr.Writer
 			stdin, err := c.StdinPipe()
