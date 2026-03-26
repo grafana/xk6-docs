@@ -74,4 +74,4 @@
 ### CI/CD
 - CI: lint + test + build on push/PR to main.
 - Release: triggered by `vx.y.z` tag push. Builds k6 binaries (with this extension via xk6) for linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64. Publishes binaries + `checksums.txt` to a GitHub release.
-- Bundle sync: runs every 3 hours (or manual). Compares k6-docs version folders (v1.5.x+) against existing bundle assets; builds missing bundles and rebuilds stale ones.
+- Bundle sync: runs every 3 hours (or manual). Compares k6-docs version folders (v1.5.x+) against existing bundle assets; builds missing bundles and rebuilds stale ones. Detection logic is in `.github/scripts/sync.sh`, tested by `sync_test.sh` (run via `make test-gh`). To verify sync is working: compare `gh release view doc-bundles` asset dates against `gh api repos/grafana/k6-docs/commits?per_page=1&path=docs/sources/k6/<version>` dates — no version folder should be newer than its bundle.
