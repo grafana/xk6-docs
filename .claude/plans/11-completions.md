@@ -67,6 +67,8 @@ Impact: Users who rely on auto-provisioning get no tab completions. No error —
 
 Fix required in k6 core: k6 needs to intercept `__complete`/`__completeNoDesc` the same way it intercepts regular commands — detect the unregistered extension, provision if needed, and forward the `__complete` call to the provisioned binary. The provisioned binary is already cached from the first `k6 x docs` run, so the Tab-press latency would just be the subprocess spawn.
 
+Tracked in: https://github.com/grafana/k6/issues/5757
+
 Workaround for users: build with xk6 (`xk6 build --with xk6-docs`) so the extension is compiled directly into the binary.
 
 
@@ -74,7 +76,7 @@ Workaround for users: build with xk6 (`xk6 build --with xk6-docs`) so the extens
 
 **What was delivered:**
 - `completion.go` — `setupForCompletion`, `completionTopicArgs`, `completionFirstArg`, `completionDeeper`, `newTopicCompletion`, `completionDirs`
-- `completion_test.go` — 10 test cases covering all arg positions, filtering, nil index, directives
+- `testdata/scripts/completion.txtar` — ~10 testscript scenarios covering all arg positions, filtering, deduplication, nil index, directives
 - `cmd.go` changes — `ValidArgsFunction` on docs/search/skill commands, flag completions for version/cache-dir/depth
 - `AGENTS.md` — documented the completions feature
 
@@ -142,7 +144,7 @@ Functions:
 - All completions are plain names without descriptions (for grid display in shells).
 - Always returns `cobra.ShellCompDirectiveNoFileComp`.
 
-`completion_test.go` — 10 test cases covering all arg positions, filtering, nil index, directives.
+`testdata/scripts/completion.txtar` — ~10 testscript scenarios covering all arg positions, prefix filtering, deduplication, nil index, bad cache, and directives.
 
 
 ### Milestone 2: Wire completions into cobra commands
@@ -163,7 +165,7 @@ Document the completions feature: `ValidArgsFunction` provides dynamic topic com
 **Unit tests:**
 
 Run `go test -v ./...` from the repo root. All tests pass, including:
-- `TestCompleteTopicArgs` — verifies completion logic for all arg positions, filtering, nil index, deduplication, directives
+- `TestScripts/completion` — testscript scenarios verifying completion logic for all arg positions, prefix filtering, deduplication, nil index, bad cache, and directives
 
 **Linter:**
 
@@ -200,7 +202,7 @@ All steps are safe to repeat. Tests are deterministic and use in-memory filesyst
 **New files:**
 
 - `completion.go` — completion logic, no external dependencies beyond cobra types
-- `completion_test.go` — unit tests for completion logic
+- `testdata/scripts/completion.txtar` — testscript integration tests for completion
 
 **Modified files:**
 
