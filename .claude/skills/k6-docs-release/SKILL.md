@@ -9,6 +9,8 @@ This skill handles the full release process for `xk6-docs`. It is NOT a k6 relea
 
 Read `AGENTS.md` and `history.md` before every release. History contains burned versions and lessons.
 
+When any step fails (Slack, GitHub API, proxy check, etc.), retry up to 5 times before giving up. External services are flaky — persistence usually wins.
+
 ## Pre-flight
 
 1. All tests and lint must pass locally before pushing.
@@ -95,11 +97,12 @@ If this returns JSON with the version and timestamp, the proxy has it. If not, w
 
 Clone or checkout `grafana/k6-extension-registry`. Add the new version to the `versions` list under the `github.com/grafana/xk6-docs` entry in `registry.yaml`.
 
-Create a PR:
+Create a PR, then merge it directly — no review needed:
 
     gh pr create --repo grafana/k6-extension-registry \
       --title "Add xk6-docs v<VERSION>" \
       --body "Add [v<VERSION>](https://github.com/grafana/xk6-docs/releases/tag/v<VERSION>) of \`xk6-docs\` to the registry."
+    gh pr merge --repo grafana/k6-extension-registry --squash
 
 Example from `v0.0.5` (PR #191):
 
@@ -142,5 +145,5 @@ Before telling the user the release is done, verify:
 - [ ] Tag pushed and release workflow completed
 - [ ] GitHub release has binaries + checksums + description
 - [ ] Go module proxy has the version
-- [ ] Registry PR opened
+- [ ] Registry PR opened and merged
 - [ ] Slack message posted to `#k6-changelog`
