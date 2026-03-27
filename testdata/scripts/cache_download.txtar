@@ -6,6 +6,7 @@ bundlesrv $WORK/bundle
 exec ./k6 x docs
 stdout '# k6 v0\.55\.x'
 stdout 'javascript-api'
+stderr 'Downloading k6 v0.55.x docs'
 
 # Metadata written after download.
 exists $WORK/home/.local/share/k6/docs/v0.55.x/.last_check

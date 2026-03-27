@@ -230,6 +230,9 @@ func setup(
 	}
 
 	if cacheDir == "" {
+		if !IsCached(gs.FS, gs.Env, version) {
+			gs.Logger.Infof("Downloading k6 %s docs...", version)
+		}
 		cacheDir, err = EnsureDocs(ctx, gs.FS, gs.Env, version, http.DefaultClient)
 		if err != nil {
 			return "", "", nil, fmt.Errorf("ensure docs: %w", err)
