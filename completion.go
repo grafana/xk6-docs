@@ -1,6 +1,7 @@
 package docs
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -11,12 +12,17 @@ import (
 func newTopicCompletion(
 	gs *state.GlobalState, opts *docsOpts,
 ) func(*cobra.Command, []string, string) ([]cobra.Completion, cobra.ShellCompDirective) {
-	return func(_ *cobra.Command, args []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
-		idx := setupForCompletion(gs, opts)
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
+		idx, version := setupForCompletion(gs, opts)
+		if idx == nil && version != "" {
+			msg := fmt.Sprintf("Press ENTER to load the k6 %s docs for completions to work.", version)
+			comps := cobra.AppendActiveHelp(nil, msg)
+			return comps, cobra.ShellCompDirectiveNoFileComp
+		}
 		if idx == nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return completionTopicArgs(idx, args, toComplete)
+		return completionTopicArgs(cmd, idx, args, toComplete)
 	}
 }
 
@@ -26,7 +32,10 @@ func completionDirs(
 	return nil, cobra.ShellCompDirectiveFilterDirs
 }
 
-func setupForCompletion(gs *state.GlobalState, opts *docsOpts) *Index {
+// setupForCompletion loads the index from the local cache without network I/O.
+// Returns the index and the resolved version. When the index is nil but
+// version is non-empty, the cache is missing for that version.
+func setupForCompletion(gs *state.GlobalState, opts *docsOpts) (*Index, string) {
 	version := opts.version
 	if version == "" {
 		version = gs.Env["K6_DOCS_VERSION"]
@@ -34,7 +43,7 @@ func setupForCompletion(gs *state.GlobalState, opts *docsOpts) *Index {
 	if version == "" {
 		v, err := DetectK6Version()
 		if err != nil {
-			return nil
+			return nil, ""
 		}
 		version = v
 	}
@@ -48,23 +57,21 @@ func setupForCompletion(gs *state.GlobalState, opts *docsOpts) *Index {
 	if cacheDir == "" {
 		dir, err := CacheDir(gs.Env, version)
 		if err != nil {
-			return nil
+			return nil, ""
 		}
 		cacheDir = dir
 	}
 
-	if !IsCached(gs.FS, gs.Env, version) {
-		if !dirExists(gs.FS, cacheDir) {
-			return nil
-		}
+	if !dirExists(gs.FS, cacheDir) {
+		return nil, version
 	}
 
 	idx, err := LoadIndex(gs.FS, cacheDir)
 	if err != nil {
-		return nil
+		return nil, ""
 	}
 
-	return idx
+	return idx, version
 }
 
 func dirExists(afs fsext.Fs, path string) bool {
@@ -73,22 +80,31 @@ func dirExists(afs fsext.Fs, path string) bool {
 }
 
 func completionTopicArgs(
-	idx *Index, args []string, toComplete string,
+	cmd *cobra.Command, idx *Index, args []string, toComplete string,
 ) ([]cobra.Completion, cobra.ShellCompDirective) {
 	if idx == nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
 	if len(args) == 0 {
-		return completionFirstArg(idx, toComplete), cobra.ShellCompDirectiveNoFileComp
+		return completionFirstArg(cmd, idx, toComplete), cobra.ShellCompDirectiveNoFileComp
 	}
 
 	return completionDeeper(idx, args, toComplete), cobra.ShellCompDirectiveNoFileComp
 }
 
-func completionFirstArg(idx *Index, toComplete string) []cobra.Completion {
+func completionFirstArg(cmd *cobra.Command, idx *Index, toComplete string) []cobra.Completion {
 	prefix := strings.ToLower(toComplete)
 	var comps []cobra.Completion
+
+	// Add subcommands (hidden from cobra to suppress them when cache
+	// is missing, so we add them here when the cache is ready).
+	for _, sub := range cmd.Commands() {
+		if !strings.HasPrefix(sub.Name(), prefix) {
+			continue
+		}
+		comps = append(comps, fmt.Sprintf("%s\t%s", sub.Name(), sub.Short))
+	}
 
 	topLevel := make(map[string]bool)
 	for _, sec := range idx.TopLevel() {

@@ -21,8 +21,9 @@
 
 ## Shell completions
 - `ValidArgsFunction` on the `docs` and `search` commands provides dynamic topic completion via cobra's `__complete` mechanism. Users set up completions once via k6's built-in `k6 completion zsh` (or bash/fish/powershell); extensions like xk6-docs piggyback on that.
-- First-arg completions include categories, JS API module shortcuts, and `best-practices`. Deeper args complete children of the resolved slug.
-- Completions require cached docs — if the cache doesn't exist, no completions are returned (no network I/O). Users must run `k6 x docs` once to trigger the initial download.
+- First-arg completions include categories, JS API module shortcuts, `best-practices`, and the `search`/`skill` subcommands. Deeper args complete children of the resolved slug.
+- The `search` and `skill` subcommands are marked `Hidden` in cobra so cobra's completion engine doesn't add them automatically. Instead, `completionFirstArg` adds them manually. This gives the completion function full control over when subcommands appear — they are suppressed when the cache is missing (only the active help message is shown).
+- Completions require cached docs. When the cache doesn't exist, an active help message prompts the user to run `k6 x docs` to download the bundle. No completions are returned until the cache is populated. Other errors (bad index, version detection failure) are silent.
 
 ## Slug resolution
 - Categories are derived from the bundle's `sections.json` at runtime — no hardcoded category list in the binary. If the first arg (or its first segment) exists as a slug in the index, it's used directly. Otherwise, it's treated as a JS API module shorthand.

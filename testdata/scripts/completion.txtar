@@ -58,9 +58,18 @@ exec ./k6 __complete x docs nonexistent-topic-xyz ''
 ! stdout 'alpha'
 stdout ':4'
 
-# Bad cache → nil index → no completions.
+# Bad cache → nil index → no completions, no active help.
 env K6_DOCS_CACHE_DIR=$WORK/bad-cache
 exec ./k6 __complete x docs ''
+! stdout 'javascript-api'
+! stdout '_activeHelp_'
+stdout ':4'
+
+# No cache → active help prompts user to run 'k6 x docs', no completions.
+env K6_DOCS_CACHE_DIR=$WORK/no-such-dir
+exec ./k6 __complete x docs ''
+stdout '_activeHelp_.*ENTER.*v0.55.x'
+! stdout 'search'
 ! stdout 'javascript-api'
 stdout ':4'
 

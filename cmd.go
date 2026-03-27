@@ -62,6 +62,7 @@ Use search to find topics quickly.`,
 			return runSearch(gs, cmd, args, &opts)
 		},
 	}
+	searchCmd.Hidden = true // completions adds it manually so we control when it appears
 	searchCmd.ValidArgsFunction = completionTopics
 	cmd.AddCommand(searchCmd)
 
@@ -80,6 +81,7 @@ With a directory argument, installs the skill files there.`,
 			return runSkill(gs.FS, cmd.OutOrStdout(), gs.Stdout.IsTTY, gs.CmdArgs[0], args)
 		},
 	}
+	skillCmd.Hidden = true // completions adds it manually so we control when it appears
 	skillCmd.ValidArgsFunction = completionDirs
 	cmd.AddCommand(skillCmd)
 
