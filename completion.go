@@ -14,7 +14,7 @@ func newTopicCompletion(
 ) func(*cobra.Command, []string, string) ([]cobra.Completion, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
 		idx, version := setupForCompletion(gs, opts)
-		if idx == nil && version != "" {
+		if idx == nil && version != "" && gs.Flags.AutoExtensionResolution {
 			msg := fmt.Sprintf("Press ENTER to load the k6 %s docs for completions to work.", version)
 			comps := cobra.AppendActiveHelp(nil, msg)
 			return comps, cobra.ShellCompDirectiveNoFileComp
