@@ -73,5 +73,12 @@ stdout '_activeHelp_.*ENTER.*v0.55.x'
 ! stdout 'javascript-api'
 stdout ':4'
 
+# No cache + provisioned binary → no active help (old cobra in k6 treats markers as completions).
+env K6_AUTO_EXTENSION_RESOLUTION=false
+exec ./k6 __complete x docs ''
+! stdout '_activeHelp_'
+! stdout 'javascript-api'
+stdout ':4'
+
 -- bad-cache/sections.json --
 {bad json
