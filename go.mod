@@ -7,7 +7,7 @@ toolchain go1.25.8
 require (
 	github.com/charmbracelet/glamour v1.0.0
 	github.com/creack/pty v1.1.24
-	github.com/go-git/go-git/v5 v5.17.0
+	github.com/go-git/go-git/v5 v5.17.1
 	github.com/klauspost/compress v1.18.5
 	github.com/muesli/termenv v0.16.0
 	github.com/rogpeppe/go-internal v1.14.1
