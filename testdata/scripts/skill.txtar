@@ -9,7 +9,7 @@ stdout 'Skill installed'
 exists $WORK/dest/xk6-docs/SKILL.md
 exists $WORK/dest/xk6-docs/scripts/validate-paths.sh
 grep 'k6 docs' $WORK/dest/xk6-docs/SKILL.md
-grep 'grep -rl' $WORK/dest/xk6-docs/SKILL.md
+grep 'x docs' $WORK/dest/xk6-docs/SKILL.md
 ! grep '<binary>' $WORK/dest/xk6-docs/SKILL.md
 checkperm 0750 $WORK/dest/xk6-docs/scripts/validate-paths.sh
 
@@ -20,11 +20,11 @@ exec ./k6 x docs skill $WORK/dest
 ! exists $WORK/dest/xk6-docs/stale.txt
 exists $WORK/dest/xk6-docs/SKILL.md
 
-# resolveBinaryPath PATH branch: bare name resolves via exec.LookPath.
+# resolveBinaryPath PATH branch: bare name keeps the short name.
 mkdir $WORK/bin
 cp $WORK/k6 $WORK/bin/k6
 env PATH=$WORK/bin
-exec $WORK/bin/k6 x docs skill $WORK/dest-path
+exec k6 x docs skill $WORK/dest-path
 grep 'k6 docs' $WORK/dest-path/xk6-docs/SKILL.md
 
 # resolveBinaryPath relative-path branch: ./k6 resolves to absolute path.

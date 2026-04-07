@@ -1,0 +1,17 @@
+# TTY gets content, not agent guide
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x
+stdout '# k6 v0.55.x'
+! stdout 'Recipes'
+
+# TTY with topic gets topic content
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a fn-one
+stdout 'modA.fnOne'
+! stdout '# k6 docs'
+
+# TTY search gets search results
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search k6
+stdout 'k6-mod-a'
+! stdout '# k6 docs'

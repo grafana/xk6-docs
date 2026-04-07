@@ -1,12 +1,20 @@
-# Main command help text
-exec ./k6 x docs --help
+# TTY help shows usage with the actual command name in examples.
+env NO_COLOR=1
+ptyexec ./k6 x docs --help
 stdout 'Offline k6 documentation'
-stdout 'Auto-downloads docs matching your k6 version'
-stdout 'Use search to find topics'
-stdout 'docs \[topic\] \[subtopic\.\.\.\]'
-stdout 'search'
 stdout 'k6 x docs http get'
+stdout 'k6 x docs search websocket'
+stdout 'k6 x docs best-practices'
+stdout 'skill'
 
-# Search subcommand help text
-exec ./k6 x docs search --help
+# Renamed binary uses its own name in examples.
+cp ./k6 ./mybin
+env NO_COLOR=1
+ptyexec ./mybin x docs --help
+stdout 'mybin x docs http get'
+! stdout 'k6 x docs http get'
+
+# Search subcommand help.
+env NO_COLOR=1
+ptyexec ./k6 x docs search --help
 stdout 'Fuzzy search across all topics'

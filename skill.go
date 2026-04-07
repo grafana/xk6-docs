@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -85,11 +84,11 @@ func supportedAgents() []agentEntry {
 	}
 }
 
-func skillHelpTable() string {
+func skillHelpTable(cmdName string) string {
 	var b strings.Builder
 	b.WriteString("# Install the k6 docs agent skill\n\n")
 	b.WriteString("Run this command with a skill directory to install:\n\n")
-	b.WriteString("```\nk6 x docs skill <directory>\n```\n\n")
+	_, _ = fmt.Fprintf(&b, "```\n%s x docs skill <directory>\n```\n\n", cmdName)
 	b.WriteString("| Agent | Skill directory |\n")
 	b.WriteString("|---|---|\n")
 	for _, a := range supportedAgents() {
@@ -101,7 +100,8 @@ func skillHelpTable() string {
 
 func runSkill(afs fsext.Fs, w io.Writer, isTTY bool, binaryPath string, args []string) error {
 	if len(args) == 0 {
-		table := skillHelpTable()
+		cmdName := filepath.Base(binaryPath)
+		table := skillHelpTable(cmdName)
 		if isTTY {
 			return renderMarkdown(w, table, 80)
 		}
@@ -124,21 +124,14 @@ func runSkill(afs fsext.Fs, w io.Writer, isTTY bool, binaryPath string, args []s
 	return nil
 }
 
-// resolveBinaryPath finds the absolute path of the binary.
-// If binaryPath contains no directory separator (bare name like "k6"),
-// it searches PATH via exec.LookPath. Otherwise resolves relative to cwd.
+// resolveBinaryPath returns the path to embed in the installed skill.
+// Bare names ("k6") are kept as-is so the skill uses whatever is in PATH.
+// Relative paths ("./custom-k6") are resolved to absolute so the skill
+// works regardless of cwd. Symlinks are NOT followed — the user-facing
+// path is preserved, not an internal provisioning cache path.
 func resolveBinaryPath(binaryPath string) (string, error) {
 	if filepath.Base(binaryPath) == binaryPath {
-		found, err := exec.LookPath(binaryPath)
-		if err != nil {
-			return "", fmt.Errorf("look up %q in PATH: %w", binaryPath, err)
-		}
-		return filepath.EvalSymlinks(found)
+		return binaryPath, nil
 	}
-
-	abs, err := filepath.Abs(binaryPath)
-	if err != nil {
-		return "", err
-	}
-	return filepath.EvalSymlinks(abs)
+	return filepath.Abs(binaryPath)
 }

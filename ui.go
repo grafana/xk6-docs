@@ -1,31 +1,93 @@
 package docs
 
 import (
-	"errors"
+	"bytes"
 	"fmt"
 	"io"
-	"io/fs"
-	"path/filepath"
+	"os/exec"
 	"sort"
 	"strings"
 
-	"go.k6.io/k6/lib/fsext"
+	"github.com/spf13/cobra"
+	"go.k6.io/k6/cmd/state"
+	"golang.org/x/term"
 )
 
-// docsEnv bundles the context needed for reading and transforming docs.
-type docsEnv struct {
-	FS       fsext.Fs
-	CacheDir string
-	Version  string
-	Depth    int
+// runCtx holds the common state prepared by prepareRun for both docs and search.
+type runCtx struct {
+	env   *docsEnv
+	idx   *Index
+	w     io.Writer
+	flush func() error
 }
 
-func (env *docsEnv) readAndTransform(relPath string) string {
-	raw := readMarkdown(env.FS, env.CacheDir, relPath)
-	if raw == "" {
-		return ""
+// prepareRun handles setup shared by runDocs and runSearch:
+// version/cache resolution, depth, and renderer buffering.
+func prepareRun(gs *state.GlobalState, cmd *cobra.Command, opts *docsOpts) (*runCtx, error) {
+	version, cacheDir, idx, err := setup(cmd.Context(), gs, opts.version, opts.cacheDir)
+	if err != nil {
+		return nil, err
 	}
-	return Transform(raw, env.Version)
+
+	depth := defaultDepth
+	if opts.depth > 0 {
+		depth = opts.depth
+	}
+
+	width := opts.width
+	if width == 0 {
+		const defaultWidth = 80
+		w, _, err := term.GetSize(gs.Stdout.RawOutFd)
+		if err == nil && w > 0 {
+			width = w
+		} else {
+			width = defaultWidth
+		}
+	}
+
+	env := &docsEnv{FS: gs.FS, CacheDir: cacheDir, Version: version, Depth: depth}
+
+	baseW := cmd.OutOrStdout()
+	w := baseW
+	var buf *bytes.Buffer
+
+	if gs.Stdout.IsTTY && !gs.Flags.NoColor || opts.pager {
+		buf = &bytes.Buffer{}
+		w = buf
+	}
+
+	flush := func() error {
+		if buf == nil || buf.Len() == 0 {
+			return nil
+		}
+		if opts.pager {
+			pagerCmd := gs.Env["PAGER"]
+			if pagerCmd == "" {
+				pagerCmd = "less -r"
+			}
+			parts := strings.Split(pagerCmd, " ")
+			// pagerCmd is the user's $PAGER env var; intentionally user-controlled.
+			c := exec.CommandContext(cmd.Context(), parts[0], parts[1:]...) // #nosec G204
+			c.Stdout = gs.Stdout.Writer
+			c.Stderr = gs.Stderr.Writer
+			stdin, err := c.StdinPipe()
+			if err != nil {
+				return err
+			}
+			if err := c.Start(); err != nil {
+				return err
+			}
+			err = renderMarkdown(stdin, buf.String(), width)
+			_ = stdin.Close()
+			if waitErr := c.Wait(); err == nil {
+				err = waitErr
+			}
+			return err
+		}
+		return renderMarkdown(gs.Stdout.Writer, buf.String(), width)
+	}
+
+	return &runCtx{env: env, idx: idx, w: w, flush: flush}, nil
 }
 
 // childName returns the short name of a child relative to its parent.
@@ -118,6 +180,8 @@ func printTOC(w io.Writer, idx *Index, version string, depth int) {
 	_, _ = fmt.Fprintf(w, "# k6 %s\n", version)
 	printTree(w, idx, idx.TopLevel(), "", "", depth)
 	printExample(w, "k6 x docs <topic>")
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w, "> AI agent? Run `k6 x docs skill` to install the k6 docs skill.")
 }
 
 // printSection prints a section's markdown content, read from the cache dir.
@@ -285,60 +349,4 @@ func printSearchChildren(w io.Writer, idx *Index, members []*Section, groupSlug 
 		}
 	}
 	return firstSlug
-}
-
-// printAgentGuide prints a self-contained guide for AI agents, pointing them
-// to the cached docs directory so they can read files directly.
-// It reads the embedded SKILL.md, strips YAML frontmatter, and replaces
-// the <dir> placeholder with the actual markdown path.
-func printAgentGuide(w io.Writer, cacheDir string) {
-	data, err := skillFiles.ReadFile("skills/xk6-docs/SKILL.md")
-	if err != nil {
-		_, _ = fmt.Fprintln(w, filepath.Join(cacheDir, "markdown"))
-		return
-	}
-	content := stripFrontmatter(string(data))
-	dir := filepath.Join(cacheDir, "markdown")
-	_, _ = fmt.Fprint(w, strings.ReplaceAll(content, "<dir>", dir))
-}
-
-// stripFrontmatter removes YAML frontmatter (--- delimited) from the start of content.
-func stripFrontmatter(s string) string {
-	if !strings.HasPrefix(s, "---") {
-		return s
-	}
-	if end := strings.Index(s[3:], "\n---"); end >= 0 {
-		return strings.TrimLeft(s[end+7:], "\n")
-	}
-	return s
-}
-
-// printBestPractices reads and prints the best_practices.md file from the cache.
-func printBestPractices(env *docsEnv, w io.Writer) error {
-	path := filepath.Join(env.CacheDir, "markdown", "best_practices.md")
-	data, err := fsext.ReadFile(env.FS, path)
-	if errors.Is(err, fs.ErrNotExist) {
-		// Fall back to old bundle layout for backward compatibility.
-		path = filepath.Join(env.CacheDir, "best_practices.md")
-		data, err = fsext.ReadFile(env.FS, path)
-	}
-	if err != nil {
-		return fmt.Errorf("read best practices: %w", err)
-	}
-	content := Transform(string(data), env.Version)
-	_, _ = fmt.Fprint(w, content)
-	if !strings.HasSuffix(content, "\n") {
-		_, _ = fmt.Fprintln(w)
-	}
-	return nil
-}
-
-// readMarkdown reads a markdown file from the cache directory.
-func readMarkdown(afs fsext.Fs, cacheDir, relPath string) string {
-	path := filepath.Join(cacheDir, "markdown", relPath)
-	data, err := fsext.ReadFile(afs, path)
-	if err != nil {
-		return ""
-	}
-	return string(data)
 }

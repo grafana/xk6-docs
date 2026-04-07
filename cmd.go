@@ -1,17 +1,10 @@
 package docs
 
 import (
-	"bytes"
-	"context"
 	"fmt"
-	"io"
-	"net/http"
-	"os/exec"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"go.k6.io/k6/cmd/state"
-	"golang.org/x/term"
 )
 
 func newCmd(gs *state.GlobalState) *cobra.Command {
@@ -21,6 +14,10 @@ func newCmd(gs *state.GlobalState) *cobra.Command {
 func newDocsCmd(gs *state.GlobalState) *cobra.Command {
 	var opts docsOpts
 
+	// agentHandled is set by PersistentPreRunE when non-TTY output
+	// has been printed. RunE checks it and returns nil immediately.
+	var agentHandled bool
+
 	cmd := &cobra.Command{
 		Use:   "docs [topic] [subtopic...]",
 		Short: "Print k6 documentation",
@@ -29,13 +26,26 @@ func newDocsCmd(gs *state.GlobalState) *cobra.Command {
 Auto-downloads docs matching your k6 version on first run, then serves
 from cache. Topics resolve from space-separated args (e.g. "http get").
 Use search to find topics quickly.`,
-		Example: `  k6 x docs                        Show table of contents
-  k6 x docs http                   Read the HTTP module docs
-  k6 x docs http get               Read a specific topic
-  k6 x docs search websocket       Search across all docs
-  k6 x docs best-practices         Show best practices guide`,
+
 		Args: cobra.ArbitraryArgs,
+		// Non-TTY: print agent guide and stop. Runs before any subcommand
+		// (except skill, which overrides PersistentPreRunE).
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			if gs.Stdout.IsTTY || opts.pager {
+				return nil
+			}
+			_, cacheDir, _, err := setup(cmd.Context(), gs, opts.version, opts.cacheDir)
+			if err != nil {
+				return err
+			}
+			printAgentGuide(cmd.OutOrStdout(), cacheDir)
+			agentHandled = true
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if agentHandled {
+				return nil
+			}
 			return runDocs(gs, cmd, args, &opts)
 		},
 	}
@@ -53,38 +63,70 @@ Use search to find topics quickly.`,
 	_ = cmd.RegisterFlagCompletionFunc("cache-dir", completionDirs)
 	_ = cmd.RegisterFlagCompletionFunc("depth", cobra.NoFileCompletions)
 
-	searchCmd := &cobra.Command{
+	cmd.AddCommand(newSearchCmd(gs, &opts, &agentHandled, completionTopics))
+	cmd.AddCommand(newSkillCmd(gs))
+
+	// --help bypasses PreRunE, so override it for non-TTY too.
+	defaultHelp := cmd.HelpFunc()
+	cmd.SetHelpFunc(func(c *cobra.Command, args []string) {
+		if !gs.Stdout.IsTTY {
+			if _, cacheDir, _, err := setup(c.Context(), gs, opts.version, opts.cacheDir); err == nil {
+				printAgentGuide(c.OutOrStdout(), cacheDir)
+				return
+			}
+		}
+		p := c.CommandPath()
+		if c.Example == "" {
+			c.Example = fmt.Sprintf(
+				"  %s                        Show table of contents\n"+
+					"  %s http                   Read the HTTP module docs\n"+
+					"  %s http get               Read a specific topic\n"+
+					"  %s search websocket       Search across all docs\n"+
+					"  %s best-practices         Show best practices guide",
+				p, p, p, p, p)
+		}
+		defaultHelp(c, args)
+	})
+
+	return cmd
+}
+
+func newSearchCmd(
+	gs *state.GlobalState, opts *docsOpts, agentHandled *bool, completionTopics completionFunc,
+) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "search <term>",
 		Short: "Search documentation",
 		Long:  "Fuzzy search across all topics (case-insensitive, ignores punctuation).",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runSearch(gs, cmd, args, &opts)
+			if *agentHandled {
+				return nil
+			}
+			return runSearch(gs, cmd, args, opts)
 		},
 	}
-	searchCmd.Hidden = true // completions adds it manually so we control when it appears
-	searchCmd.ValidArgsFunction = completionTopics
-	cmd.AddCommand(searchCmd)
+	cmd.Hidden = true // completions adds it manually so we control when it appears
+	cmd.ValidArgsFunction = completionTopics
+	return cmd
+}
 
-	skillCmd := &cobra.Command{
+func newSkillCmd(gs *state.GlobalState) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "skill [directory]",
 		Short: "Install the agent skill for AI coding tools",
 		Long: `Install the k6 docs agent skill into a directory.
 
 Without arguments, shows a table of supported agents and their skill directories.
 With a directory argument, installs the skill files there.`,
-		Example: `  k6 x docs skill                     Show supported agents
-  k6 x docs skill ~/.claude/skills    Install for Claude Code
-  k6 x docs skill ~/.agents/skills    Install for Cursor, Codex, etc.`,
-		Args: cobra.MaximumNArgs(1),
+
+		Args:              cobra.MaximumNArgs(1),
+		PersistentPreRunE: func(*cobra.Command, []string) error { return nil }, // skip agent mode
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runSkill(gs.FS, cmd.OutOrStdout(), gs.Stdout.IsTTY, gs.CmdArgs[0], args)
 		},
 	}
-	skillCmd.Hidden = true // completions adds it manually so we control when it appears
-	skillCmd.ValidArgsFunction = completionDirs
-	cmd.AddCommand(skillCmd)
-
+	cmd.ValidArgsFunction = completionDirs
 	return cmd
 }
 
@@ -96,91 +138,13 @@ type docsOpts struct {
 	width    int
 }
 
-// runCtx holds the common state prepared by prepareRun for both docs and search.
-type runCtx struct {
-	env   *docsEnv
-	idx   *Index
-	w     io.Writer
-	flush func() error
-}
-
-// prepareRun handles setup shared by runDocs and runSearch:
-// version/cache resolution, depth, and renderer buffering.
-func prepareRun(gs *state.GlobalState, cmd *cobra.Command, opts *docsOpts) (*runCtx, error) {
-	version, cacheDir, idx, err := setup(cmd.Context(), gs, opts.version, opts.cacheDir)
-	if err != nil {
-		return nil, err
-	}
-
-	depth := defaultDepth
-	if opts.depth > 0 {
-		depth = opts.depth
-	}
-
-	width := opts.width
-	if width == 0 {
-		const defaultWidth = 80
-		w, _, err := term.GetSize(gs.Stdout.RawOutFd)
-		if err == nil && w > 0 {
-			width = w
-		} else {
-			width = defaultWidth
-		}
-	}
-
-	env := &docsEnv{FS: gs.FS, CacheDir: cacheDir, Version: version, Depth: depth}
-
-	baseW := cmd.OutOrStdout()
-	w := baseW
-	var buf *bytes.Buffer
-
-	if gs.Stdout.IsTTY && !gs.Flags.NoColor || opts.pager {
-		buf = &bytes.Buffer{}
-		w = buf
-	}
-
-	flush := func() error {
-		if buf == nil || buf.Len() == 0 {
-			return nil
-		}
-		if opts.pager {
-			pagerCmd := gs.Env["PAGER"]
-			if pagerCmd == "" {
-				pagerCmd = "less -r"
-			}
-			parts := strings.Split(pagerCmd, " ")
-			// pagerCmd is the user's $PAGER env var; intentionally user-controlled.
-			c := exec.CommandContext(cmd.Context(), parts[0], parts[1:]...) // #nosec G204
-			c.Stdout = gs.Stdout.Writer
-			c.Stderr = gs.Stderr.Writer
-			stdin, err := c.StdinPipe()
-			if err != nil {
-				return err
-			}
-			if err := c.Start(); err != nil {
-				return err
-			}
-			err = renderMarkdown(stdin, buf.String(), width)
-			_ = stdin.Close()
-			if waitErr := c.Wait(); err == nil {
-				err = waitErr
-			}
-			return err
-		}
-		return renderMarkdown(gs.Stdout.Writer, buf.String(), width)
-	}
-
-	return &runCtx{env: env, idx: idx, w: w, flush: flush}, nil
-}
+// completionFunc is the signature for cobra completion functions.
+type completionFunc = func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective)
 
 func runSearch(gs *state.GlobalState, cmd *cobra.Command, args []string, opts *docsOpts) error {
 	rc, err := prepareRun(gs, cmd, opts)
 	if err != nil {
 		return err
-	}
-	if !gs.Stdout.IsTTY {
-		printAgentGuide(rc.w, rc.env.CacheDir)
-		return rc.flush()
 	}
 	printSearch(rc.env, rc.w, rc.idx, args)
 	return rc.flush()
@@ -191,66 +155,8 @@ func runDocs(gs *state.GlobalState, cmd *cobra.Command, args []string, opts *doc
 	if err != nil {
 		return err
 	}
-	logMode(gs, gs.Stdout.IsTTY)
-	if !gs.Stdout.IsTTY && !opts.pager {
-		printAgentGuide(rc.w, rc.env.CacheDir)
-		return rc.flush()
-	}
 	if err := showDocs(rc.env, rc.w, rc.idx, args); err != nil {
 		return err
 	}
 	return rc.flush()
-}
-
-func logMode(gs *state.GlobalState, isTTY bool) {
-	if gs == nil {
-		return
-	}
-	if isTTY {
-		gs.Logger.Debug("docs: interactive mode (stdout is TTY)")
-	} else {
-		gs.Logger.Debug("docs: agent mode (stdout is not a TTY)")
-	}
-}
-
-// setup resolves the version, ensures docs are cached, and loads the index.
-// It checks flags, then env vars, then auto-detection for both version and
-// cache directory.
-func setup(
-	ctx context.Context, gs *state.GlobalState, versionFlag, cacheDirFlg string,
-) (version, cacheDir string, idx *Index, err error) {
-	version = versionFlag
-	if version == "" {
-		version = gs.Env["K6_DOCS_VERSION"]
-	}
-	if version == "" {
-		version, err = DetectK6Version()
-		if err != nil {
-			return "", "", nil, fmt.Errorf("detect k6 version: %w", err)
-		}
-	}
-
-	version = MapToWildcard(version)
-
-	cacheDir = cacheDirFlg
-	if cacheDir == "" {
-		cacheDir = gs.Env["K6_DOCS_CACHE_DIR"]
-	}
-
-	if cacheDir == "" {
-		if !IsCached(gs.FS, gs.Env, version) {
-			gs.Logger.Infof("Downloading k6 %s docs...", version)
-		}
-		cacheDir, err = EnsureDocs(ctx, gs.FS, gs.Env, version, http.DefaultClient)
-		if err != nil {
-			return "", "", nil, fmt.Errorf("ensure docs: %w", err)
-		}
-	}
-
-	idx, err = LoadIndex(gs.FS, cacheDir)
-	if err != nil {
-		return "", "", nil, fmt.Errorf("load index: %w", err)
-	}
-
-	return version, cacheDir, idx, nil
 }
