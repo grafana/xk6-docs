@@ -178,6 +178,10 @@ func runSearch(gs *state.GlobalState, cmd *cobra.Command, args []string, opts *d
 	if err != nil {
 		return err
 	}
+	if !gs.Stdout.IsTTY {
+		printAgentGuide(rc.w, rc.env.CacheDir)
+		return rc.flush()
+	}
 	printSearch(rc.env, rc.w, rc.idx, args)
 	return rc.flush()
 }
@@ -188,6 +192,10 @@ func runDocs(gs *state.GlobalState, cmd *cobra.Command, args []string, opts *doc
 		return err
 	}
 	logMode(gs, gs.Stdout.IsTTY)
+	if !gs.Stdout.IsTTY && !opts.pager {
+		printAgentGuide(rc.w, rc.env.CacheDir)
+		return rc.flush()
+	}
 	if err := showDocs(rc.env, rc.w, rc.idx, args); err != nil {
 		return err
 	}

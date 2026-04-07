@@ -8,9 +8,9 @@ exec ./k6 x docs skill $WORK/dest
 stdout 'Skill installed'
 exists $WORK/dest/xk6-docs/SKILL.md
 exists $WORK/dest/xk6-docs/scripts/validate-paths.sh
-grep 'x docs' $WORK/dest/xk6-docs/SKILL.md
+grep 'k6 docs' $WORK/dest/xk6-docs/SKILL.md
+grep 'grep -rl' $WORK/dest/xk6-docs/SKILL.md
 ! grep '<binary>' $WORK/dest/xk6-docs/SKILL.md
-grep '/.*x docs' $WORK/dest/xk6-docs/SKILL.md
 checkperm 0750 $WORK/dest/xk6-docs/scripts/validate-paths.sh
 
 # Reinstall removes stale files and updates content.
@@ -25,12 +25,12 @@ mkdir $WORK/bin
 cp $WORK/k6 $WORK/bin/k6
 env PATH=$WORK/bin
 exec $WORK/bin/k6 x docs skill $WORK/dest-path
-grep 'bin/k6 x docs' $WORK/dest-path/xk6-docs/SKILL.md
+grep 'k6 docs' $WORK/dest-path/xk6-docs/SKILL.md
 
 # resolveBinaryPath relative-path branch: ./k6 resolves to absolute path.
 cd $WORK
 exec ./k6 x docs skill $WORK/dest-rel
-grep '/k6 x docs' $WORK/dest-rel/xk6-docs/SKILL.md
+grep 'k6 docs' $WORK/dest-rel/xk6-docs/SKILL.md
 
 -- expected-agents.txt --
 Claude Code

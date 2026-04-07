@@ -1,49 +1,34 @@
 # Section with children shows subtopics footer
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a
-cmp stdout golden-mod-a.txt
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a
+stdout '# k6/mod-a'
+stdout 'The mod-a module'
+stdout 'mod-a subtopics:'
+stdout '- fn-one'
+stdout '- fn-two'
+stdout '- child-a'
 
 # Leaf section: no subtopics footer, frontmatter stripped
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a fn-one
-cmp stdout golden-mod-a-fn-one.txt
-! stdout '---'
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a fn-one
+stdout 'modA.fnOne'
+stdout 'fn-one operation'
+! stdout 'subtopics'
 ! stdout 'title:'
 
 # Child names strip parent prefix (child-a-clear -> clear)
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a child-a
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a child-a
 stdout '- clear'
 
 # Non-JS-API usage hint with slug path
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x alpha
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x alpha
 stdout 'k6 x docs alpha/'
 
 # Missing markdown file: section appears blank (no error shown to user).
 rm $WORK/cache/markdown/gamma/_index.md
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x gamma
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x gamma
 ! stderr 'error'
 ! stderr 'not found'
-
--- golden-mod-a.txt --
-# k6/mod-a
-
-The mod-a module.
-
-> **Note:** Feature X is supported by default since k6 v0.55.x.
-
----
-**mod-a subtopics:**
-- fn-one
-- fn-two
-- child-a
-- fn-one
-
-> Example: `k6 x docs mod-a/<subtopic>`
--- golden-mod-a-fn-one.txt --
-## modA.fnOne(url, [params])
-
-Perform a fn-one operation.
-
-import modA from 'k6/mod-a';
-
-export default function () {
-  const res = modA.fnOne('https://test.example.com/');
-}

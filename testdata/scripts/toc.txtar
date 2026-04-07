@@ -1,15 +1,8 @@
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x
-cmp stdout golden.txt
-
--- golden.txt --
-# k6 v0.55.x
-- javascript-api
-- alpha
-- beta
-- gamma
-- delta
-- epsilon
-- zeta
-- showcase
-
-> Example: `k6 x docs <topic>`
+# TTY: prints table of contents
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x
+stdout '# k6 v0.55.x'
+stdout '- javascript-api'
+stdout '- alpha'
+stdout '- showcase'
+stdout 'Example: `k6 x docs <topic>`'

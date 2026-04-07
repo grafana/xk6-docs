@@ -57,8 +57,8 @@ grep 'alpha/topic-three' $WORK/out/sections.json
 grep 'TopicTwo items validate' $WORK/out/sections.json
 ! grep 'Duplicate description' $WORK/out/sections.json
 
-# best_practices.md written to output.
-exists $WORK/out/best_practices.md
-grep 'Test Structure' $WORK/out/best_practices.md
-grep 'Performance' $WORK/out/best_practices.md
-grep 'Error Handling' $WORK/out/best_practices.md
+# best_practices.md written to markdown output.
+exists $WORK/out/markdown/best_practices.md
+grep 'Test Structure' $WORK/out/markdown/best_practices.md
+grep 'Performance' $WORK/out/markdown/best_practices.md
+grep 'Error Handling' $WORK/out/markdown/best_practices.md

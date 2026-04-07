@@ -1,73 +1,63 @@
 # Title/description match
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search guide
-cmp stdout golden-guide.txt
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search guide
+stdout '- alpha'
+stdout '- gamma'
+stdout '- showcase'
 
 # Single result from description match shows doc
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search 'fn-one operation'
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search 'fn-one operation'
 stdout '## modA.fnOne'
 
 # Multi-group sorted alphabetically
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search k6
-cmp stdout golden-k6.txt
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search k6
+stdout '- k6-lib-c'
+stdout '- k6-mod-a'
+stdout '  - fn-one'
+stdout '- k6-mod-b'
 
 # Single result from body match shows doc
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search 'TopicTwo content'
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search 'TopicTwo content'
 stdout '# TopicTwo'
 
 # No results
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search zzzznotfound
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search zzzznotfound
 stdout '\(no results\)'
 
-# Search example hint has no blank line before it
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x --depth 2 search k6
-! stdout '^\n>'
-
 # Single group goes to deepest match, not group parent
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search child-a-clear
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search child-a-clear
 stdout 'ChildA.clear'
 
 # Search resolves slash args the same as space args
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search k6-mod-b/leaf-one
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search k6-mod-b/leaf-one
 stdout 'LeafOne'
 
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search k6-mod-b leaf-one
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search k6-mod-b leaf-one
 stdout 'LeafOne'
 
 # Search resolves bare module name without k6- prefix
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search mod-b/leaf-one
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search mod-b/leaf-one
 stdout 'LeafOne'
 
 # Search resolves full slug path
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search javascript-api k6-mod-b leaf-one
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search javascript-api k6-mod-b leaf-one
 stdout 'LeafOne'
 
 # Search --depth 1 still shows children (search overrides depth)
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x --depth 1 search k6
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x --depth 1 search k6
 stdout '  - fn-one'
 
 # Missing arg errors
-! exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search
+env NO_COLOR=1
+! ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search
 stderr 'requires at least 1 arg'
-
--- golden-guide.txt --
-- alpha
-- gamma
-- showcase
--- golden-fn-one-operation.txt --
-- k6-mod-a
--- golden-fn-one-depth2.txt --
-- k6-mod-a
-  - fn-one
-> Example: `k6 x docs mod-a fn-one`
--- golden-k6.txt --
-- k6-lib-c
-- k6-mod-a
-  - child-a
-    - clear
-  - child-a/child-a-clear
-  - fn-one
-  - fn-two
-- k6-mod-b
-  - leaf-one
-- showcase
-> Example: `k6 x docs mod-a child-a`

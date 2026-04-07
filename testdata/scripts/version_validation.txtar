@@ -11,24 +11,30 @@ stderr 'invalid version'
 stderr 'invalid version'
 
 # Pre-release suffix stripped: v0.55.2-rc.1 → v0.55.x → cache hit.
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.2-rc.1
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.2-rc.1
 stdout '# k6 v0\.55\.x'
 
 # Build metadata stripped: v0.55.2+build.123 → v0.55.x → cache hit.
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.2+build.123
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.2+build.123
 stdout '# k6 v0\.55\.x'
 
 # Pre-release and build metadata combined.
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.0-alpha+001
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.0-alpha+001
 stdout '# k6 v0\.55\.x'
 
 # Pseudo-version maps to wildcard.
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.0-20240101000000-abcdef123456
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.0-20240101000000-abcdef123456
 stdout '# k6 v0\.55\.x'
 
 # Major.minor only stays unchanged (no patch → no wildcard mapping).
-exec ./k6 x docs --cache-dir $WORK/cache --version v1.5
-stdout '# k6 v1\.5$'
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v1.5
+stdout '# k6 v1\.5'
+! stdout '# k6 v1\.5\.'
 
 # Tab in version rejected.
 ! exec ./k6 x docs --version 'v1.6	x'

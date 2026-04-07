@@ -1,0 +1,18 @@
+# Non-TTY always prints the agent guide with recipes.
+
+# No args
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x
+stdout '# k6 docs'
+stdout $WORK'/cache/markdown'
+stdout 'grep -rl'
+stdout '_index.md'
+
+# With topic args — still prints guide, not content
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a fn-one
+stdout '# k6 docs'
+! stdout 'modA.fnOne'
+
+# Search — still prints guide, not results
+exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search k6
+stdout '# k6 docs'
+! stdout 'k6-mod-a'

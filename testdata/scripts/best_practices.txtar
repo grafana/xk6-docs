@@ -1,10 +1,15 @@
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x best-practices
-cmp stdout golden.txt
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x best-practices
+stdout 'Best Practices'
+stdout 'best practices for k6 load testing'
 ! stdout '---'
 
--- golden.txt --
-# Best Practices
+# Old bundle layout: best_practices.md at cache root still works.
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/old-cache --version v0.55.x best-practices
+stdout 'Old layout best practices'
 
-Follow these best practices for k6 load testing.
-
-Start with a small number of virtual users and gradually increase load.
+-- old-cache/sections.json --
+{"version":"v0.55.x","sections":[]}
+-- old-cache/best_practices.md --
+Old layout best practices content.

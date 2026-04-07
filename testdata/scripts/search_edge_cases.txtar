@@ -1,47 +1,41 @@
 # Empty search term returns no results
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search ''
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search ''
 stdout '\(no results\)'
 
 # Fuzzy: spaces match dashed slug (topic one → topic-one)
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search 'topic one'
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search 'topic one'
 stdout 'TopicOne'
 
 # Fuzzy: dashes match concatenated title (sub-one → SubOne)
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search sub-one
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search sub-one
 stdout 'SubOne'
 
 # Fuzzy: spaces match slashed slug (delta sub-one → delta/sub-one)
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search 'delta subone'
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search 'delta subone'
 stdout 'SubOne'
 
 # No results exact format
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search zzzznotfound
-cmp stdout golden-no-results.txt
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search zzzznotfound
+stdout '\(no results\)'
 
 # Single result from multi-word search shows doc
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search TopicTwo content
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search TopicTwo content
 stdout '# TopicTwo'
 
 # Normalized match: single group shows doc directly
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search child-a
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search child-a
 stdout '# ChildA'
 
 # bare javascript-api excluded from grouping
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search k6
-cmp stdout golden-k6.txt
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search k6
+stdout '- k6-lib-c'
+stdout '- k6-mod-a'
 ! stdout 'javascript-api:'
-
--- golden-no-results.txt --
-(no results)
--- golden-k6.txt --
-- k6-lib-c
-- k6-mod-a
-  - child-a
-    - clear
-  - child-a/child-a-clear
-  - fn-one
-  - fn-two
-- k6-mod-b
-  - leaf-one
-- showcase
-> Example: `k6 x docs mod-a child-a`

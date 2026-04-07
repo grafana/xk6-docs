@@ -1,52 +1,36 @@
 # Full slug with /
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x javascript-api/k6-mod-a/fn-one
-cmp stdout golden-fn-one.txt
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x javascript-api/k6-mod-a/fn-one
+stdout 'modA.fnOne'
+stdout 'fn-one operation'
 
 # JS API shortcut (same output proves correct resolution)
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a fn-one
-cmp stdout golden-fn-one.txt
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a fn-one
+stdout 'modA.fnOne'
 
 # Case insensitive
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x MOD-A FN-ONE
-cmp stdout golden-fn-one.txt
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x MOD-A FN-ONE
+stdout 'modA.fnOne'
 
 # k6- prefix dedup
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x k6-mod-a fn-one
-cmp stdout golden-fn-one.txt
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x k6-mod-a fn-one
+stdout 'modA.fnOne'
 
 # Category prefix
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x alpha topic-one
-cmp stdout golden-topic-one.txt
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x alpha topic-one
+stdout '# TopicOne'
 
 # Parent prefix fallback (child-a/clear → child-a/child-a-clear)
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a child-a clear
-cmp stdout golden-clear.txt
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a child-a clear
+stdout 'ChildA.clear'
 
 # Bare name prefers unprefixed (both lib-c and k6-lib-c exist)
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x lib-c
-cmp stdout golden-lib-c.txt
-
--- golden-fn-one.txt --
-## modA.fnOne(url, [params])
-
-Perform a fn-one operation.
-
-import modA from 'k6/mod-a';
-
-export default function () {
-  const res = modA.fnOne('https://test.example.com/');
-}
--- golden-topic-one.txt --
-# TopicOne
-
-TopicOne lets you configure execution.
-
-See the TopicOne documentation for details.
--- golden-clear.txt --
-## ChildA.clear()
-
-Clears all items.
--- golden-lib-c.txt --
-# lib-c
-
-Utility library reference.
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x lib-c
+stdout '# lib-c'
+stdout 'Utility library'

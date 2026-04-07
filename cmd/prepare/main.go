@@ -1,9 +1,8 @@
 // Command prepare processes the k6-docs repository into a doc bundle
 // suitable for embedding. It walks the documentation tree, transforms
 // Hugo shortcodes into clean markdown, and produces:
-//   - markdown/ — transformed .md files
+//   - markdown/ — transformed .md files (including best_practices.md)
 //   - sections.json — structured index of all sections
-//   - best_practices.md — a comprehensive best practices guide
 package main
 
 import (
@@ -426,11 +425,12 @@ func writeSectionsJSON(afs fsext.Fs, outputDir string, idx docs.Index) error {
 
 // writeBestPractices writes a comprehensive best practices guide.
 func writeBestPractices(afs fsext.Fs, outputDir string) error {
-	if err := afs.MkdirAll(outputDir, 0o750); err != nil {
+	markdownDir := filepath.Join(outputDir, "markdown")
+	if err := afs.MkdirAll(markdownDir, 0o750); err != nil {
 		return fmt.Errorf("create output dir: %w", err)
 	}
 
-	outPath := filepath.Join(outputDir, "best_practices.md")
+	outPath := filepath.Join(markdownDir, "best_practices.md")
 	if err := fsext.WriteFile(afs, outPath, []byte(bestPracticesContent), 0o600); err != nil {
 		return fmt.Errorf("write best_practices.md: %w", err)
 	}

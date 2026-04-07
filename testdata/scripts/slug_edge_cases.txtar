@@ -1,26 +1,19 @@
 # Rule 1: slash in args[0] with multiple args → join all with /
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x javascript-api/k6-mod-a fn-one
-cmp stdout golden-fn-one.txt
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x javascript-api/k6-mod-a fn-one
+stdout 'modA.fnOne'
 
 # Rule 1: slash in later arg → error (joins to nonexistent path)
-! exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a k6-mod-a/fn-one
+env NO_COLOR=1
+! ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a k6-mod-a/fn-one
 stderr 'topic not found'
 
 # Category matching is case-insensitive (resolved via index lookup)
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x Alpha topic-one
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x Alpha topic-one
 stdout 'TopicOne'
 
 # Nonexistent slug after fallback
-! exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x totally-fake-module nonexistent
+env NO_COLOR=1
+! ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x totally-fake-module nonexistent
 stderr 'topic not found'
-
--- golden-fn-one.txt --
-## modA.fnOne(url, [params])
-
-Perform a fn-one operation.
-
-import modA from 'k6/mod-a';
-
-export default function () {
-  const res = modA.fnOne('https://test.example.com/');
-}

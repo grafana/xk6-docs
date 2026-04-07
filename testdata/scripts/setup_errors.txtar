@@ -1,13 +1,16 @@
 # Bad sections.json → load index error
-! exec ./k6 x docs --cache-dir $WORK/bad-cache --version v0.55.x
+env NO_COLOR=1
+! ptyexec ./k6 x docs --cache-dir $WORK/bad-cache --version v0.55.x
 stderr 'load index'
 
 # Missing cache directory → load index error
-! exec ./k6 x docs --cache-dir $WORK/nonexistent --version v0.55.x
+env NO_COLOR=1
+! ptyexec ./k6 x docs --cache-dir $WORK/nonexistent --version v0.55.x
 stderr 'load index'
 
 # Ghost child slug in sections.json → parent renders without crashing
-exec ./k6 x docs --cache-dir $WORK/ghost-cache --version v0.55.x ghost-parent
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/ghost-cache --version v0.55.x ghost-parent
 stdout '- real-child'
 ! stdout 'missing-child'
 

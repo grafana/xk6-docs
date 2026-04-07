@@ -4,9 +4,12 @@ env K6_DOCS_VERSION=v0.55.x
 env K6_DOCS_CACHE_DIR=
 bundlesrv $WORK/bundle
 exec ./k6 x docs
-stdout '# k6 v0\.55\.x'
-stdout 'javascript-api'
+stdout 'markdown'
 stderr 'Downloading k6 v0.55.x docs'
+
+# Verify downloaded content exists on disk.
+exists $WORK/home/.local/share/k6/docs/v0.55.x/markdown/javascript-api/_index.md
+grep 'JavaScript API' $WORK/home/.local/share/k6/docs/v0.55.x/markdown/javascript-api/_index.md
 
 # Metadata written after download.
 exists $WORK/home/.local/share/k6/docs/v0.55.x/.last_check
@@ -15,7 +18,7 @@ grep '"v1"' $WORK/home/.local/share/k6/docs/v0.55.x/.etag
 
 # Second call serves from cache (no re-download needed).
 exec ./k6 x docs
-stdout '# k6 v0\.55\.x'
+stdout 'markdown'
 
 # HTTP error → download fails.
 cp status-404.txt $WORK/.bundlesrv-status
@@ -28,12 +31,13 @@ env HOME=$WORK/home3
 rm $WORK/.bundlesrv-status
 bundlesrv $WORK/bundle
 exec ./k6 x docs
-stdout '# k6 v0\.55\.x'
+stdout 'markdown'
 # Change server content — but cache is fresh, so no re-download.
 cp updated-index.txt $WORK/bundle/sections.json
 exec ./k6 x docs
-stdout '# k6 v0\.55\.x'
-stdout 'javascript-api'
+stdout 'markdown'
+# Original content still on disk.
+grep 'JavaScript API' $WORK/home3/.local/share/k6/docs/v0.55.x/markdown/javascript-api/_index.md
 # Restore original bundle content for subsequent tests.
 cp original-index.txt $WORK/bundle/sections.json
 
@@ -42,24 +46,27 @@ env HOME=$WORK/home4
 rm $WORK/.bundlesrv-etag
 bundlesrv $WORK/bundle-v2
 exec ./k6 x docs
-stdout '# k6 v0\.55\.x'
+stdout 'markdown'
 backdate-lastcheck $WORK/home4/.local/share/k6/docs/v0.55.x
 cp etag-v2.txt $WORK/.bundlesrv-etag
 exec ./k6 x docs
-stdout '- updated'
+stdout 'markdown'
+exists $WORK/home4/.local/share/k6/docs/v0.55.x/markdown/updated/_index.md
 
 # Staleness: same ETag → no re-download (content stays from first download).
 env HOME=$WORK/home-same-etag
 rm $WORK/.bundlesrv-etag
 bundlesrv $WORK/bundle
 exec ./k6 x docs
-stdout 'javascript-api'
+stdout 'markdown'
 backdate-lastcheck $WORK/home-same-etag/.local/share/k6/docs/v0.55.x
 # Server now serves different content but SAME ETag → should NOT re-download.
 bundlesrv $WORK/bundle-v2
 exec ./k6 x docs
-stdout 'javascript-api'
-! stdout '- updated'
+stdout 'markdown'
+# Original content still on disk.
+exists $WORK/home-same-etag/.local/share/k6/docs/v0.55.x/markdown/javascript-api/_index.md
+! exists $WORK/home-same-etag/.local/share/k6/docs/v0.55.x/markdown/updated
 
 # Oversized file in bundle → extraction error.
 env HOME=$WORK/home-oversize
@@ -83,7 +90,7 @@ env HOME=$WORK/home-symlink
 cp symlink-flag.txt $WORK/.bundlesrv-symlink
 bundlesrv $WORK/bundle
 exec ./k6 x docs
-stdout 'javascript-api'
+stdout 'markdown'
 ! exists $WORK/home-symlink/.local/share/k6/docs/v0.55.x/link.txt
 exists $WORK/home-symlink/.local/share/k6/docs/v0.55.x/sections.json
 rm $WORK/.bundlesrv-symlink
@@ -101,15 +108,15 @@ env HOME=$WORK/home-multi
 env K6_DOCS_VERSION=v1.0.x
 bundlesrv $WORK/bundle
 exec ./k6 x docs
-stdout 'javascript-api'
+stdout 'markdown'
 env K6_DOCS_VERSION=v2.0.x
 bundlesrv $WORK/bundle-v2
 exec ./k6 x docs
-stdout '- updated'
+stdout 'markdown'
 # Both versions still cached.
 env K6_DOCS_VERSION=v1.0.x
 exec ./k6 x docs
-stdout 'javascript-api'
+exists $WORK/home-multi/.local/share/k6/docs/v1.0.x/markdown/javascript-api/_index.md
 
 # File permissions after extraction.
 env HOME=$WORK/home-perms
@@ -123,33 +130,34 @@ checkperm 0640 $WORK/home-perms/.local/share/k6/docs/v0.55.x/sections.json
 env HOME=$WORK/home-corrupt-lc
 bundlesrv $WORK/bundle
 exec ./k6 x docs
-stdout 'javascript-api'
+stdout 'markdown'
 cp corrupt-timestamp.txt $WORK/home-corrupt-lc/.local/share/k6/docs/v0.55.x/.last_check
 exec ./k6 x docs
-stdout 'javascript-api'
+stdout 'markdown'
 
 # Staleness: corrupt .etag self-heals (triggers re-download with new content).
 env HOME=$WORK/home-corrupt-etag
 bundlesrv $WORK/bundle
 exec ./k6 x docs
-stdout 'javascript-api'
+stdout 'markdown'
 backdate-lastcheck $WORK/home-corrupt-etag/.local/share/k6/docs/v0.55.x
 cp empty.txt $WORK/home-corrupt-etag/.local/share/k6/docs/v0.55.x/.etag
 cp etag-v2.txt $WORK/.bundlesrv-etag
 bundlesrv $WORK/bundle-v2
 exec ./k6 x docs
-stdout '- updated'
+stdout 'markdown'
+exists $WORK/home-corrupt-etag/.local/share/k6/docs/v0.55.x/markdown/updated/_index.md
 
 # Staleness: network error falls back to cached copy.
 env HOME=$WORK/home-netfail
 rm $WORK/.bundlesrv-etag
 bundlesrv $WORK/bundle
 exec ./k6 x docs
-stdout 'javascript-api'
+stdout 'markdown'
 backdate-lastcheck $WORK/home-netfail/.local/share/k6/docs/v0.55.x
 cp status-500.txt $WORK/.bundlesrv-status
 exec ./k6 x docs
-stdout 'javascript-api'
+stdout 'markdown'
 
 # Staleness: slow server times out, falls back to cache.
 # Use a 1s timeout to keep the test fast.
@@ -158,11 +166,11 @@ env K6_DOCS_REFRESH_TIMEOUT=1s
 rm $WORK/.bundlesrv-status
 bundlesrv $WORK/bundle
 exec ./k6 x docs
-stdout 'javascript-api'
+stdout 'markdown'
 backdate-lastcheck $WORK/home-slow/.local/share/k6/docs/v0.55.x
 cp slow-flag.txt $WORK/.bundlesrv-slow
 exec ./k6 x docs
-stdout 'javascript-api'
+stdout 'markdown'
 rm $WORK/.bundlesrv-slow
 env K6_DOCS_REFRESH_TIMEOUT=
 

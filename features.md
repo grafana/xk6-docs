@@ -4,7 +4,7 @@ Every user-observable behavior of the `k6 x docs` CLI.
 
 ## CLI commands and flags (cmd.go)
 
-1. `k6 x docs` with no args shows TOC
+1. `k6 x docs` with no args: TTY shows TOC, non-TTY prints agent guide (markdown dir path + browsing tips)
 2. `k6 x docs <topic> [subtopic...]` shows topic content
 3. `k6 x docs search <term>` fuzzy-searches docs
 4. `k6 x docs skill [dir]` installs agent skill or shows help
@@ -16,7 +16,7 @@ Every user-observable behavior of the `k6 x docs` CLI.
 10. `K6_DOCS_VERSION` env var used when no `--version`
 11. `K6_DOCS_CACHE_DIR` env var used when no `--cache-dir`
 12. TTY stdout → glamour ANSI rendering
-13. Non-TTY stdout → raw markdown
+13. Non-TTY stdout → raw markdown (for topic lookups); agent guide (for no-args)
 14. `--no-color` flag disables rendering even on TTY
 15. Debug log: "interactive mode" or "agent mode" on stderr
 16. Auto-downloads docs on first run

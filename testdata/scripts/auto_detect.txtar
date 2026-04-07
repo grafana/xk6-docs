@@ -1,5 +1,6 @@
 # Auto-detect from build info succeeds with the real k6 binary.
 # It finds go.k6.io/k6 v1.5.0 and maps to v1.5.x.
 env K6_DOCS_CACHE_DIR=$WORK/cache
-exec ./k6 x docs
+env NO_COLOR=1
+ptyexec ./k6 x docs
 stdout '# k6 v1\.5\.x'

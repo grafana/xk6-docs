@@ -14,7 +14,7 @@
 `k6 x docs` — offline k6 documentation in the terminal. For humans and AI agents. Docs are not embedded in the binary. On first run, the extension detects the k6 version from build info, downloads a matching compressed doc bundle (`.tar.zst`) from GitHub releases, and caches it locally (`~/.local/share/k6/docs/{version}/`). Subsequent runs serve from cache with no network. Cached bundles are checked for staleness every 24 hours via ETag comparison; stale bundles are re-downloaded automatically. A separate standalone prepare tool (`cmd/prepare/`) builds these bundles by cloning the k6-docs Hugo repository, transforming markdown into CLI-friendly format, building a searchable index (`sections.json`), and compressing everything. CI auto-publishes bundles as assets under a single `doc-bundles` GitHub release.
 
 ## Browsing
-- `k6 x docs` prints `# k6 {version}` header followed by a depth-controlled bullet tree of categories and their children (default depth: 1), and a blockquote example hint.
+- `k6 x docs` with no args: **TTY** prints `# k6 {version}` header followed by a depth-controlled bullet tree of categories and their children (default depth: 1), and a blockquote example hint. **Non-TTY** (agent mode) prints a concise agent guide: the `markdown/` directory path and browsing tips, so agents can read docs directly from the filesystem without using the CLI.
 - `k6 x docs http get` resolves args to a slug (case-insensitive) and prints the cached markdown content (trimmed). If the topic has children, a `---` separator and `**{path} subtopics:**` section is appended with a depth-controlled bullet tree of children, and a blockquote example hint using the slug path form (`k6 x docs {path}/<subtopic>`).
 - `k6 x docs best-practices` prints a curated guide (embedded in the prepare tool via `//go:embed`).
 - `k6 x docs search <query>` fuzzy searches (case-insensitive, ignores punctuation, spaces, slashes) and prints an indented tree: `- {group}` with `  - {child}` underneath, no descriptions. Footer shows `Example:` with a sample navigation command. Search uses the same arg normalization and resolve rules as docs navigation (shared `normalizeArgs` and `ResolveWithLookup`), so `search browser page`, `search browser/page`, and `search javascript-api browser page` all produce the same results. `--depth` flag controls tree depth (same as TOC/section footers).
@@ -57,7 +57,7 @@
 - Walks markdown files, parses YAML frontmatter (deduplicates duplicate keys by keeping first occurrence), derives slugs. All top-level directories are included (only the shared content directory is skipped).
 - Handles slug collisions: prefers `_index.md` over leaf `.md` (it has children).
 - Populates parent→child relationships.
-- Outputs: `dist/sections.json`, `dist/markdown/**/*.md`, `dist/best_practices.md`.
+- Outputs: `dist/sections.json`, `dist/markdown/**/*.md` (including `best_practices.md`).
 
 ### Agent skill (`skills/xk6-docs/`)
 - Installable via `k6 x docs skill <dir>` (embeds SKILL.md + references via `//go:embed`, templates `<binary>` placeholder with the running binary's absolute path via `os.Args[0]`).

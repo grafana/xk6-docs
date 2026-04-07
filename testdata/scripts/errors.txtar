@@ -1,9 +1,11 @@
 # Unknown topic
-! exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x nonexistent-topic-xyz
+env NO_COLOR=1
+! ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x nonexistent-topic-xyz
 stderr 'topic not found'
 
 # Missing best_practices.md
-! exec ./k6 x docs --cache-dir $WORK/empty-cache --version v0.55.x best-practices
+env NO_COLOR=1
+! ptyexec ./k6 x docs --cache-dir $WORK/empty-cache --version v0.55.x best-practices
 stderr 'best practices'
 
 -- empty-cache/sections.json --

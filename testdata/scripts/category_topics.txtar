@@ -1,13 +1,17 @@
 # Top-level categories resolve correctly
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x delta
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x delta
 stdout 'Delta'
 
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x epsilon
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x epsilon
 stdout 'Epsilon'
 
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x zeta
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x zeta
 stdout 'Zeta'
 
 # Subtopic under delta
-exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x delta sub-one
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x delta sub-one
 stdout 'SubOne'

@@ -5,32 +5,35 @@ description: Look up k6 documentation to write k6 load tests, browser tests, and
 
 # k6 docs
 
-Read k6 docs via `<binary> x docs`.
+k6 documentation is a directory of markdown files at: <dir>
 
-If `<binary>` is not found: tell the user to re-run `k6 x docs skill <dir>` to update the skill, then stop.
+Browse and read them directly. Combine commands with `&&` and `|` to minimize calls.
 
-## Commands
+## Structure
 
+- `_index.md` in each directory has the overview and lists children.
+- Directories map to topic areas: `using-k6/`, `javascript-api/`, `using-k6-browser/`, `examples/`.
+- API modules are under `javascript-api/` with a `k6-` prefix (e.g. `k6-browser/`, `k6-net-grpc/`).
+
+## Recipes
+
+```sh
+# Start with _index.md — it has the overview
+cat <dir>/javascript-api/_index.md
+
+# Find topics by keyword
+grep -rl "websocket" <dir>/ --include="*.md"
+
+# Scan titles in a directory
+head -5 <dir>/using-k6/*.md
+
+# Read multiple files in one call
+cat <dir>/using-k6/thresholds.md <dir>/using-k6/metrics.md
+
+# Find by path
+find <dir> -name "*.md" -path "*browser*"
+
+# Combine: discover and read in one call
+ls <dir>/javascript-api/k6-browser/ && cat <dir>/javascript-api/k6-browser/framelocator/_index.md
+grep -rl "grpc" <dir>/ --include="*.md" | head -5 | xargs cat
 ```
-<binary> x docs                        # overview
-<binary> x docs <path>                 # read a topic; shows content + subtopics at the bottom
-<binary> x docs <path> --depth 2      # read a topic + 2 levels of subtopics in one call
-<binary> x docs search <term>         # fuzzy search; returns matching paths
-```
-
-Paths use spaces or slashes interchangeably.
-
-## Strategy
-
-2 calls is the target.
-
-Try a direct path first — wrong paths don't error, they return subtopics to guide your next call. Only use search or overview when you have no idea where to look.
-
-Once you have a path (from a subtopics list or search), go to it directly — don't visit the parent to confirm first.
-
-When a topic page shows a method table with descriptions, that is the complete API — no need to read individual method sub-pages.
-
-## Rules
-
-- Full parent path required: `using-k6 thresholds` works, `thresholds` alone fails.
-- `k6-` prefix is auto-added on `javascript-api` paths where needed.

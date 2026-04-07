@@ -1,8 +1,10 @@
 package docs
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -285,10 +287,41 @@ func printSearchChildren(w io.Writer, idx *Index, members []*Section, groupSlug 
 	return firstSlug
 }
 
+// printAgentGuide prints a self-contained guide for AI agents, pointing them
+// to the cached docs directory so they can read files directly.
+// It reads the embedded SKILL.md, strips YAML frontmatter, and replaces
+// the <dir> placeholder with the actual markdown path.
+func printAgentGuide(w io.Writer, cacheDir string) {
+	data, err := skillFiles.ReadFile("skills/xk6-docs/SKILL.md")
+	if err != nil {
+		_, _ = fmt.Fprintln(w, filepath.Join(cacheDir, "markdown"))
+		return
+	}
+	content := stripFrontmatter(string(data))
+	dir := filepath.Join(cacheDir, "markdown")
+	_, _ = fmt.Fprint(w, strings.ReplaceAll(content, "<dir>", dir))
+}
+
+// stripFrontmatter removes YAML frontmatter (--- delimited) from the start of content.
+func stripFrontmatter(s string) string {
+	if !strings.HasPrefix(s, "---") {
+		return s
+	}
+	if end := strings.Index(s[3:], "\n---"); end >= 0 {
+		return strings.TrimLeft(s[end+7:], "\n")
+	}
+	return s
+}
+
 // printBestPractices reads and prints the best_practices.md file from the cache.
 func printBestPractices(env *docsEnv, w io.Writer) error {
-	path := filepath.Join(env.CacheDir, "best_practices.md")
+	path := filepath.Join(env.CacheDir, "markdown", "best_practices.md")
 	data, err := fsext.ReadFile(env.FS, path)
+	if errors.Is(err, fs.ErrNotExist) {
+		// Fall back to old bundle layout for backward compatibility.
+		path = filepath.Join(env.CacheDir, "best_practices.md")
+		data, err = fsext.ReadFile(env.FS, path)
+	}
 	if err != nil {
 		return fmt.Errorf("read best practices: %w", err)
 	}
