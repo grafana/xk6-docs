@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestDetectK6Version(t *testing.T) {
+func Test_detectK6Version(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {

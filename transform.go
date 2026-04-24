@@ -42,7 +42,7 @@ func PrepareTransform(content string, sharedContent map[string]string) string {
 		if !ok {
 			return ""
 		}
-		return StripFrontmatter(raw)
+		return stripFrontmatter(raw)
 	})
 }
 
@@ -63,7 +63,7 @@ func PrepareTransform(content string, sharedContent map[string]string) string {
 //  7. Strip HTML comments
 //  8. Strip YAML frontmatter
 //  9. Normalize whitespace
-func Transform(content, version string) string {
+func transform(content, version string) string {
 	if content == "" {
 		return ""
 	}
@@ -125,7 +125,7 @@ func Transform(content, version string) string {
 	s = reHTMLComment.ReplaceAllString(s, "")
 
 	// 9. Strip YAML frontmatter.
-	s = StripFrontmatter(s)
+	s = stripFrontmatter(s)
 
 	// 10. Normalize whitespace: collapse 3+ consecutive newlines to 2.
 	s = reExtraNewline.ReplaceAllString(s, "\n\n")
@@ -155,10 +155,10 @@ func SplitFrontmatter(content string) (yamlBlock, body string, ok bool) {
 	return content[4 : 4+end], content[cutAt:], true
 }
 
-// StripFrontmatter removes YAML frontmatter (delimited by "---") from the
+// stripFrontmatter removes YAML frontmatter (delimited by "---") from the
 // start of content. If the content doesn't start with "---\n" or the closing
 // delimiter is missing, it returns the content unchanged.
-func StripFrontmatter(content string) string {
+func stripFrontmatter(content string) string {
 	_, body, _ := SplitFrontmatter(content)
 	return body
 }

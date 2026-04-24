@@ -161,7 +161,7 @@ func showDocs(env *docsEnv, w io.Writer, idx *Index, args []string) error {
 		return printBestPractices(env, w)
 	}
 
-	slug := ResolveWithLookup(args, func(s string) bool {
+	slug := resolveWithLookup(args, func(s string) bool {
 		_, ok := idx.Lookup(s)
 		return ok
 	})
@@ -221,7 +221,7 @@ func searchResults(idx *Index, args []string, readContent func(string) string) [
 	exists := func(s string) bool { _, ok := idx.Lookup(s); return ok }
 
 	term := strings.Join(args, "/")
-	resolved := ResolveWithLookup(args, exists)
+	resolved := resolveWithLookup(args, exists)
 
 	seen := make(map[string]*Section)
 	var results []*Section

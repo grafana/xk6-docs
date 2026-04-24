@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"net/http"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 
 	"go.k6.io/k6/cmd/state"
@@ -27,7 +28,7 @@ func (env *docsEnv) readAndTransform(relPath string) string {
 	if raw == "" {
 		return ""
 	}
-	return Transform(raw, env.Version)
+	return transform(raw, env.Version)
 }
 
 // setup resolves the version, ensures docs are cached, and loads the index.
@@ -41,7 +42,7 @@ func setup(
 		version = gs.Env["K6_DOCS_VERSION"]
 	}
 	if version == "" {
-		version, err = DetectK6Version()
+		version, err = detectK6Version(debug.ReadBuildInfo)
 		if err != nil {
 			return "", "", nil, fmt.Errorf("detect k6 version: %w", err)
 		}
@@ -55,7 +56,7 @@ func setup(
 	}
 
 	if cacheDir == "" {
-		if !IsCached(gs.FS, gs.Env, version) {
+		if !isCached(gs.FS, gs.Env, version) {
 			gs.Logger.Infof("Downloading k6 %s docs...", version)
 		}
 		cacheDir, err = EnsureDocs(ctx, gs.FS, gs.Env, version, http.DefaultClient)
@@ -94,7 +95,7 @@ func printBestPractices(env *docsEnv, w io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("read best practices: %w", err)
 	}
-	content := Transform(string(data), env.Version)
+	content := transform(string(data), env.Version)
 	_, _ = fmt.Fprint(w, content)
 	if !strings.HasSuffix(content, "\n") {
 		_, _ = fmt.Fprintln(w)

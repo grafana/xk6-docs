@@ -52,9 +52,9 @@ func resolveRefreshTimeout(env map[string]string) time.Duration {
 	return defaultRefreshTimeout
 }
 
-// CacheDir returns the local cache directory for a given docs version.
+// cacheDir returns the local cache directory for a given docs version.
 // The layout is ~/.local/share/k6/docs/{version}/.
-func CacheDir(env map[string]string, version string) (string, error) {
+func cacheDir(env map[string]string, version string) (string, error) {
 	home, err := homeDirFromEnv(env)
 	if err != nil {
 		return "", fmt.Errorf("cache dir: %w", err)
@@ -62,9 +62,9 @@ func CacheDir(env map[string]string, version string) (string, error) {
 	return filepath.Join(home, ".local", "share", "k6", "docs", version), nil
 }
 
-// IsCached reports whether the docs for the given version are already cached.
-func IsCached(afs fsext.Fs, env map[string]string, version string) bool {
-	dir, err := CacheDir(env, version)
+// isCached reports whether the docs for the given version are already cached.
+func isCached(afs fsext.Fs, env map[string]string, version string) bool {
+	dir, err := cacheDir(env, version)
 	if err != nil {
 		return false
 	}
@@ -81,7 +81,7 @@ func EnsureDocs(
 	if !isValidVersion(version) {
 		return "", fmt.Errorf("invalid version %q: must contain only alphanumeric, dot, hyphen, underscore", version)
 	}
-	dir, err := CacheDir(env, version)
+	dir, err := cacheDir(env, version)
 	if err != nil {
 		return "", err
 	}

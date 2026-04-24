@@ -2,6 +2,7 @@ package docs
 
 import (
 	"fmt"
+	"runtime/debug"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -41,7 +42,7 @@ func setupForCompletion(gs *state.GlobalState, opts *docsOpts) (*Index, string) 
 		version = gs.Env["K6_DOCS_VERSION"]
 	}
 	if version == "" {
-		v, err := DetectK6Version()
+		v, err := detectK6Version(debug.ReadBuildInfo)
 		if err != nil {
 			return nil, ""
 		}
@@ -50,23 +51,23 @@ func setupForCompletion(gs *state.GlobalState, opts *docsOpts) (*Index, string) 
 
 	version = MapToWildcard(version)
 
-	cacheDir := opts.cacheDir
-	if cacheDir == "" {
-		cacheDir = gs.Env["K6_DOCS_CACHE_DIR"]
+	docsCacheDir := opts.cacheDir
+	if docsCacheDir == "" {
+		docsCacheDir = gs.Env["K6_DOCS_CACHE_DIR"]
 	}
-	if cacheDir == "" {
-		dir, err := CacheDir(gs.Env, version)
+	if docsCacheDir == "" {
+		dir, err := cacheDir(gs.Env, version)
 		if err != nil {
 			return nil, ""
 		}
-		cacheDir = dir
+		docsCacheDir = dir
 	}
 
-	if !dirExists(gs.FS, cacheDir) {
+	if !dirExists(gs.FS, docsCacheDir) {
 		return nil, version
 	}
 
-	idx, err := LoadIndex(gs.FS, cacheDir)
+	idx, err := LoadIndex(gs.FS, docsCacheDir)
 	if err != nil {
 		return nil, ""
 	}
@@ -144,7 +145,7 @@ func completionFirstArg(cmd *cobra.Command, idx *Index, toComplete string) []cob
 
 func completionDeeper(idx *Index, args []string, toComplete string) []cobra.Completion {
 	exists := func(s string) bool { _, ok := idx.Lookup(s); return ok }
-	slug := ResolveWithLookup(args, exists)
+	slug := resolveWithLookup(args, exists)
 
 	sec, ok := idx.Lookup(slug)
 	if !ok || len(sec.Children) == 0 {

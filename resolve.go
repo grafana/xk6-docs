@@ -2,13 +2,6 @@ package docs
 
 import "strings"
 
-// ResolveWithLookup converts CLI args into a canonical documentation slug.
-// When exists is non-nil, it disambiguates javascript-api children that
-// may or may not carry the k6- prefix.
-//
-// The k6- prefix fallback is handled in a single place (withK6Prefix)
-// and applies to all javascript-api slugs regardless of how they were
-// constructed (shorthand or full path).
 // normalizeArgs flattens slash-separated segments in args.
 // Shared by both slug resolution and search term preparation.
 func normalizeArgs(args []string) []string {
@@ -23,14 +16,14 @@ func normalizeArgs(args []string) []string {
 	return flat
 }
 
-// ResolveWithLookup converts CLI args into a canonical documentation slug.
+// resolveWithLookup converts CLI args into a canonical documentation slug.
 // When exists is non-nil, it disambiguates javascript-api children that
 // may or may not carry the k6- prefix.
 //
 // The k6- prefix fallback is handled in a single place (withK6Prefix)
 // and applies to all javascript-api slugs regardless of how they were
 // constructed (shorthand or full path).
-func ResolveWithLookup(args []string, exists func(string) bool) string {
+func resolveWithLookup(args []string, exists func(string) bool) string {
 	if len(args) == 0 {
 		return ""
 	}

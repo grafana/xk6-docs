@@ -71,8 +71,3 @@ func MapToWildcard(version string) string {
 
 	return result
 }
-
-// DetectK6Version is a convenience wrapper that uses the real debug.ReadBuildInfo.
-func DetectK6Version() (string, error) {
-	return detectK6Version(debug.ReadBuildInfo)
-}
