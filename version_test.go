@@ -42,6 +42,38 @@ func TestDetectK6Version(t *testing.T) {
 			available: true,
 			want:      "v0.55.x",
 		},
+		{
+			name: "k6 v2 module path",
+			info: &debug.BuildInfo{Deps: []*debug.Module{
+				{Path: "go.k6.io/k6/v2", Version: "v2.0.0"},
+			}},
+			available: true,
+			want:      "v2.0.x",
+		},
+		{
+			name: "k6 v10 module path",
+			info: &debug.BuildInfo{Deps: []*debug.Module{
+				{Path: "go.k6.io/k6/v10", Version: "v10.1.0"},
+			}},
+			available: true,
+			want:      "v10.1.x",
+		},
+		{
+			name: "non-k6 module with similar path",
+			info: &debug.BuildInfo{Deps: []*debug.Module{
+				{Path: "go.k6.io/k6/validator", Version: "v1.0.0"},
+			}},
+			available: true,
+			wantErr:   true,
+		},
+		{
+			name: "k6 v0 not matched",
+			info: &debug.BuildInfo{Deps: []*debug.Module{
+				{Path: "go.k6.io/k6/v0", Version: "v0.1.0"},
+			}},
+			available: true,
+			wantErr:   true,
+		},
 	}
 
 	for _, tt := range tests {

@@ -2,12 +2,15 @@ package docs
 
 import (
 	"errors"
+	"regexp"
 	"runtime/debug"
 	"strings"
 )
 
 // detectK6Version reads build info using the provided function and returns the
 // wildcard-mapped version of the go.k6.io/k6 dependency.
+var k6ModuleRe = regexp.MustCompile(`^go\.k6\.io/k6(/v[1-9][0-9]*)?$`)
+
 func detectK6Version(readBuildInfo func() (*debug.BuildInfo, bool)) (string, error) {
 	info, ok := readBuildInfo()
 	if !ok {
@@ -15,7 +18,7 @@ func detectK6Version(readBuildInfo func() (*debug.BuildInfo, bool)) (string, err
 	}
 
 	for _, dep := range info.Deps {
-		if dep.Path == "go.k6.io/k6" {
+		if k6ModuleRe.MatchString(dep.Path) {
 			return MapToWildcard(dep.Version), nil
 		}
 	}
