@@ -8,7 +8,7 @@ set -euo pipefail
 # Required env: GH_TOKEN
 # Usage: .github/scripts/bundle-sync.sh
 
-MIN_VERSION="v1.5.x"
+MIN_VERSION="v0.47.x"
 
 # Get existing bundle assets with their upload dates.
 declare -A ASSET_DATES
