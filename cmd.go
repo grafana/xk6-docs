@@ -34,11 +34,11 @@ Use search to find topics quickly.`,
 			if gs.Stdout.IsTTY || opts.pager {
 				return nil
 			}
-			_, cacheDir, _, err := setup(cmd.Context(), gs, opts.version, opts.cacheDir)
+			env, err := setup(cmd.Context(), gs, opts.version, opts.cacheDir)
 			if err != nil {
 				return err
 			}
-			printAgentGuide(cmd.OutOrStdout(), cacheDir)
+			printAgentGuide(cmd.OutOrStdout(), agentCacheDir(env))
 			agentHandled = true
 			return nil
 		},
@@ -70,8 +70,8 @@ Use search to find topics quickly.`,
 	defaultHelp := cmd.HelpFunc()
 	cmd.SetHelpFunc(func(c *cobra.Command, args []string) {
 		if !gs.Stdout.IsTTY {
-			if _, cacheDir, _, err := setup(c.Context(), gs, opts.version, opts.cacheDir); err == nil {
-				printAgentGuide(c.OutOrStdout(), cacheDir)
+			if env, err := setup(c.Context(), gs, opts.version, opts.cacheDir); err == nil {
+				printAgentGuide(c.OutOrStdout(), agentCacheDir(env))
 				return
 			}
 		}
@@ -89,6 +89,11 @@ Use search to find topics quickly.`,
 	})
 
 	return cmd
+}
+
+// agentCacheDir returns the markdown directory path for the agent guide.
+func agentCacheDir(env *docsEnv) string {
+	return env.cacheDir
 }
 
 func newSearchCmd(
@@ -146,7 +151,7 @@ func runSearch(gs *state.GlobalState, cmd *cobra.Command, args []string, opts *d
 	if err != nil {
 		return err
 	}
-	printSearch(rc.env, rc.w, rc.idx, args)
+	printSearch(cmd.Context(), rc.env, rc.w, rc.env.idx, args)
 	return rc.flush()
 }
 
@@ -155,7 +160,7 @@ func runDocs(gs *state.GlobalState, cmd *cobra.Command, args []string, opts *doc
 	if err != nil {
 		return err
 	}
-	if err := showDocs(rc.env, rc.w, rc.idx, args); err != nil {
+	if err := showDocs(cmd.Context(), rc.env, rc.w, rc.env.idx, args); err != nil {
 		return err
 	}
 	return rc.flush()

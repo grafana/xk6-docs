@@ -2,6 +2,8 @@ package docs
 
 import "strings"
 
+const jsAPISlug = "javascript-api"
+
 // normalizeArgs flattens slash-separated segments in args.
 // Shared by both slug resolution and search term preparation.
 func normalizeArgs(args []string) []string {

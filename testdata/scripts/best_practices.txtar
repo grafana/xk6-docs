@@ -9,7 +9,7 @@ env NO_COLOR=1
 ptyexec ./k6 x docs --cache-dir $WORK/old-cache --version v0.55.x best-practices
 stdout 'Old layout best practices'
 
--- old-cache/sections.json --
+-- old-cache/v0.55.x/sections.json --
 {"version":"v0.55.x","sections":[]}
--- old-cache/best_practices.md --
+-- old-cache/v0.55.x/best_practices.md --
 Old layout best practices content.

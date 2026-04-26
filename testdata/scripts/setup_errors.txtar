@@ -14,9 +14,9 @@ ptyexec ./k6 x docs --cache-dir $WORK/ghost-cache --version v0.55.x ghost-parent
 stdout '- real-child'
 ! stdout 'missing-child'
 
--- bad-cache/sections.json --
+-- bad-cache/v0.55.x/sections.json --
 {bad json
--- ghost-cache/sections.json --
+-- ghost-cache/v0.55.x/sections.json --
 {
   "version": "v0.55.x",
   "sections": [
@@ -42,12 +42,12 @@ stdout '- real-child'
     }
   ]
 }
--- ghost-cache/markdown/ghost-parent/_index.md --
+-- ghost-cache/v0.55.x/markdown/ghost-parent/_index.md --
 ---
 title: 'GhostParent'
 ---
 # GhostParent
--- ghost-cache/markdown/ghost-parent/real-child.md --
+-- ghost-cache/v0.55.x/markdown/ghost-parent/real-child.md --
 ---
 title: 'RealChild'
 ---

@@ -9,13 +9,13 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/klauspost/compress/zstd"
-	"go.k6.io/k6/lib/fsext"
 )
 
 const (
@@ -35,7 +35,6 @@ const stalenessCheckInterval = 24 * time.Hour
 
 // defaultRefreshTimeout caps how long a staleness HEAD or refresh GET can take.
 // Keeps the offline-first experience fast when the network is slow.
-// Override via K6_DOCS_REFRESH_TIMEOUT env var (parsed as time.Duration).
 const defaultRefreshTimeout = 10 * time.Second
 
 const (
@@ -43,60 +42,41 @@ const (
 	lastCheckFile = ".last_check"
 )
 
-func resolveRefreshTimeout(env map[string]string) time.Duration {
-	if s := env["K6_DOCS_REFRESH_TIMEOUT"]; s != "" {
-		if d, err := time.ParseDuration(s); err == nil && d > 0 {
-			return d
-		}
-	}
-	return defaultRefreshTimeout
-}
-
-// cacheDir returns the local cache directory for a given docs version.
-// The layout is ~/.local/share/k6/docs/{version}/.
-func cacheDir(env map[string]string, version string) (string, error) {
-	home, err := homeDirFromEnv(env)
+// defaultBaseCacheDir returns the default base directory for all doc version caches.
+func defaultBaseCacheDir() (string, error) {
+	home, err := os.UserHomeDir() //nolint:forbidigo // UserHomeDir queries a system property, not filesystem I/O
 	if err != nil {
 		return "", fmt.Errorf("cache dir: %w", err)
 	}
-	return filepath.Join(home, ".local", "share", "k6", "docs", version), nil
+	return filepath.Join(home, ".local", "share", "k6", "docs"), nil
 }
 
-// isCached reports whether the docs for the given version are already cached.
-func isCached(afs fsext.Fs, env map[string]string, version string) bool {
-	dir, err := cacheDir(env, version)
-	if err != nil {
-		return false
-	}
-	info, err := afs.Stat(filepath.Clean(dir))
-	return err == nil && info.IsDir()
+// versionCacheDir returns the local cache directory for a specific version.
+func versionCacheDir(baseDir, version string) string {
+	return filepath.Join(baseDir, version)
 }
 
-// EnsureDocs downloads and extracts the doc bundle for the given version if it
+// ensureDocs downloads and extracts the doc bundle for the given version if it
 // is not already cached. When a cached copy exists, it periodically checks
 // the remote ETag and re-downloads if a newer bundle is available.
-func EnsureDocs(
-	ctx context.Context, afs fsext.Fs, env map[string]string, version string, httpClient *http.Client,
+func ensureDocs(
+	ctx context.Context, baseDir, version string, httpClient *http.Client,
+	fsys FS, refreshTimeout time.Duration, overrideURL string,
 ) (string, error) {
 	if !isValidVersion(version) {
 		return "", fmt.Errorf("invalid version %q: must contain only alphanumeric, dot, hyphen, underscore", version)
 	}
-	dir, err := cacheDir(env, version)
-	if err != nil {
-		return "", err
-	}
+	dir := versionCacheDir(baseDir, version)
+	url := bundleURL(version, overrideURL)
 
-	url := bundleURL(env, version)
-
-	info, statErr := afs.Stat(filepath.Clean(dir))
+	info, statErr := fsys.Stat(filepath.Clean(dir))
 	if statErr == nil && info.IsDir() {
-		// Staleness refresh is best-effort with a timeout — if it fails
-		// or takes too long, the stale cache is served silently.
-		refreshCtx, cancel := context.WithTimeout(ctx, resolveRefreshTimeout(env))
+		// Staleness refresh is best-effort with a timeout.
+		refreshCtx, cancel := context.WithTimeout(ctx, refreshTimeout)
 		defer cancel()
 
-		if checkStaleness(refreshCtx, afs, dir, url, httpClient) {
-			if err := refreshCache(refreshCtx, afs, dir, version, url, httpClient); err != nil {
+		if checkStaleness(refreshCtx, dir, url, httpClient, fsys) {
+			if err := refreshCache(refreshCtx, dir, version, url, httpClient, fsys); err != nil {
 				return "", fmt.Errorf("refresh docs %s: %w", version, err)
 			}
 		}
@@ -107,26 +87,23 @@ func EnsureDocs(
 	if err != nil {
 		return "", err
 	}
-	return dir, installBundle(afs, dir, version, body, etag)
+	return dir, installBundle(dir, version, body, etag, fsys)
 }
 
 // refreshCache replaces the cached docs with a freshly downloaded bundle.
 // On fetch failure the old cache is preserved (returns nil).
 // On install failure the broken dir is cleaned up and the error is returned
 // so the caller can report it instead of serving a missing cache.
-func refreshCache(ctx context.Context, afs fsext.Fs, dir, version, url string, httpClient *http.Client) error {
+func refreshCache(ctx context.Context, dir, version, url string, httpClient *http.Client, fsys FS) error {
 	body, etag, err := fetchBundle(ctx, httpClient, version, url)
 	if err != nil {
 		return nil //nolint:nilerr // intentional: fetch failure preserves stale cache
 	}
-	_ = afs.RemoveAll(dir)
-	return installBundle(afs, dir, version, body, etag)
+	_ = fsys.RemoveAll(dir)
+	return installBundle(dir, version, body, etag, fsys)
 }
 
 // fetchBundle downloads and buffers the entire doc bundle in memory.
-// Bundles are small (compressed docs), so the memory cost is acceptable.
-// Buffering ensures the download is complete before the caller modifies
-// any cache state.
 func fetchBundle(ctx context.Context, httpClient *http.Client, version, url string) ([]byte, string, error) {
 	resp, err := doRequest(ctx, httpClient, http.MethodGet, url)
 	if err != nil {
@@ -150,21 +127,21 @@ func fetchBundle(ctx context.Context, httpClient *http.Client, version, url stri
 }
 
 // installBundle extracts a buffered bundle into dir and writes metadata.
-func installBundle(afs fsext.Fs, dir, version string, body []byte, etag string) error {
-	if err := afs.MkdirAll(dir, 0o750); err != nil {
+func installBundle(dir, version string, body []byte, etag string, fsys FS) error {
+	if err := fsys.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("create cache dir: %w", err)
 	}
 
-	if err := extract(afs, bytes.NewReader(body), dir); err != nil {
-		_ = afs.RemoveAll(dir)
+	if err := extract(bytes.NewReader(body), dir, fsys); err != nil {
+		_ = fsys.RemoveAll(dir)
 		return fmt.Errorf("extract docs %s: %w", version, err)
 	}
 
-	if err := writeMetaFile(afs, filepath.Join(dir, etagFile), etag); err != nil {
+	if err := writeMetaFile(fsys, filepath.Join(dir, etagFile), etag); err != nil {
 		return fmt.Errorf("write etag %s: %w", version, err)
 	}
 	now := strconv.FormatInt(time.Now().Unix(), 10)
-	if err := writeMetaFile(afs, filepath.Join(dir, lastCheckFile), now); err != nil {
+	if err := writeMetaFile(fsys, filepath.Join(dir, lastCheckFile), now); err != nil {
 		return fmt.Errorf("write last check %s: %w", version, err)
 	}
 
@@ -172,11 +149,8 @@ func installBundle(afs fsext.Fs, dir, version string, body []byte, etag string) 
 }
 
 // checkStaleness reports whether the cache should be re-downloaded.
-// Metadata parse errors are treated as stale so a corrupt .last_check
-// or .etag self-heals on the next run instead of hard-failing.
-// Network errors fall back to the cached copy silently.
-func checkStaleness(ctx context.Context, afs fsext.Fs, dir, url string, httpClient *http.Client) bool {
-	if !isStale(afs, dir) {
+func checkStaleness(ctx context.Context, dir, url string, httpClient *http.Client, fsys FS) bool {
+	if !isStale(dir, fsys) {
 		return false
 	}
 
@@ -191,14 +165,10 @@ func checkStaleness(ctx context.Context, afs fsext.Fs, dir, url string, httpClie
 	}
 
 	remoteETag := resp.Header.Get("ETag")
-	// Ignore read errors: a missing or corrupt .etag returns "" which won't
-	// match any real ETag, so we re-download — the safe self-healing behaviour.
-	storedETag, _ := readMetaFile(afs, filepath.Join(dir, etagFile))
+	storedETag, _ := readMetaFile(fsys, filepath.Join(dir, etagFile))
 
 	if remoteETag == storedETag {
-		// Non-critical: failing to update the timestamp just means
-		// we'll re-check on the next run.
-		_ = writeMetaFile(afs, filepath.Join(dir, lastCheckFile),
+		_ = writeMetaFile(fsys, filepath.Join(dir, lastCheckFile),
 			strconv.FormatInt(time.Now().Unix(), 10))
 		return false
 	}
@@ -207,10 +177,8 @@ func checkStaleness(ctx context.Context, afs fsext.Fs, dir, url string, httpClie
 }
 
 // isStale reports whether the cache's last check is older than stalenessCheckInterval.
-// Missing, unreadable, or malformed .last_check is treated as stale so the
-// cache self-heals instead of hard-failing.
-func isStale(afs fsext.Fs, dir string) bool {
-	data, err := fsext.ReadFile(afs, filepath.Join(dir, lastCheckFile))
+func isStale(dir string, fsys FS) bool {
+	data, err := fsys.ReadFile(filepath.Join(dir, lastCheckFile))
 	if err != nil {
 		return true
 	}
@@ -222,8 +190,8 @@ func isStale(afs fsext.Fs, dir string) bool {
 }
 
 // readMetaFile reads a small metadata file. A missing file returns ("", nil).
-func readMetaFile(afs fsext.Fs, path string) (string, error) {
-	data, err := fsext.ReadFile(afs, path)
+func readMetaFile(fsys FS, path string) (string, error) {
+	data, err := fsys.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return "", nil
 	}
@@ -233,12 +201,12 @@ func readMetaFile(afs fsext.Fs, path string) (string, error) {
 	return strings.TrimSpace(string(data)), nil
 }
 
-func writeMetaFile(afs fsext.Fs, path, content string) error {
-	return fsext.WriteFile(afs, path, []byte(content), 0o640)
+func writeMetaFile(fsys FS, path, content string) error {
+	return fsys.WriteFile(path, []byte(content), 0o600)
 }
 
 // extract decompresses a zstd-compressed tar stream into destDir.
-func extract(afs fsext.Fs, r io.Reader, destDir string) error {
+func extract(r io.Reader, destDir string, fsys FS) error {
 	zr, err := zstd.NewReader(r)
 	if err != nil {
 		return fmt.Errorf("zstd reader: %w", err)
@@ -264,11 +232,11 @@ func extract(afs fsext.Fs, r io.Reader, destDir string) error {
 
 		switch hdr.Typeflag {
 		case tar.TypeDir:
-			if err := afs.MkdirAll(target, 0o750); err != nil {
+			if err := fsys.MkdirAll(target, 0o750); err != nil {
 				return fmt.Errorf("mkdir %s: %w", target, err)
 			}
 		case tar.TypeReg:
-			if err := afs.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+			if err := fsys.MkdirAll(filepath.Dir(target), 0o750); err != nil {
 				return fmt.Errorf("mkdir parent %s: %w", target, err)
 			}
 			data, err := io.ReadAll(io.LimitReader(tr, maxFileSize+1))
@@ -278,7 +246,7 @@ func extract(afs fsext.Fs, r io.Reader, destDir string) error {
 			if int64(len(data)) > maxFileSize {
 				return fmt.Errorf("file %s exceeds maximum size (%d bytes)", target, maxFileSize)
 			}
-			if err := fsext.WriteFile(afs, target, data, 0o640); err != nil {
+			if err := fsys.WriteFile(target, data, 0o600); err != nil {
 				return fmt.Errorf("write %s: %w", target, err)
 			}
 		}
@@ -297,22 +265,19 @@ func doRequest(ctx context.Context, client *http.Client, method, reqURL string) 
 }
 
 // bundleURL returns the download URL for a docs bundle.
-// K6_DOCS_BUNDLE_URL overrides the default GitHub release URL.
-func bundleURL(env map[string]string, version string) string {
-	if override := env["K6_DOCS_BUNDLE_URL"]; override != "" {
-		return override
+func bundleURL(version, overrideURL string) string {
+	if overrideURL != "" {
+		return overrideURL
 	}
 	const base = "https://github.com/grafana/xk6-docs/releases/download"
 	return base + "/doc-bundles/docs-" + version + ".tar.zst"
 }
 
 // isValidVersion reports whether version is safe to embed in a URL path.
-// Valid versions contain only alphanumeric chars, dots, hyphens, and underscores.
 func isValidVersion(version string) bool {
 	if version == "" {
 		return false
 	}
-	// Reject path traversal: ".", "..", or any dots-only string.
 	if strings.Trim(version, ".") == "" {
 		return false
 	}

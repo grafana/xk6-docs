@@ -39,3 +39,6 @@ stdout '# k6 v1\.5'
 # Tab in version rejected.
 ! exec ./k6 x docs --version 'v1.6	x'
 stderr 'invalid version'
+
+-- cache/v1.5/sections.json --
+{"version":"v1.5","sections":[]}

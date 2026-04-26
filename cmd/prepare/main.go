@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	git "github.com/go-git/go-git/v5"
-	docs "github.com/grafana/xk6-docs"
+	docs "github.com/grafana/xk6-docs/docs"
 	"go.k6.io/k6/lib/fsext"
 	"gopkg.in/yaml.v3"
 )
@@ -72,7 +72,7 @@ func run(
 
 	// The k6-docs repo uses wildcard directories (e.g. "v1.6.x"), so convert
 	// exact versions like "v1.6.1" to the wildcard form for the path lookup.
-	docsVersion := docs.MapToWildcard(k6Version)
+	docsVersion := docs.VersionWildcard(k6Version)
 	versionRoot := filepath.Join(docsPath, "docs", "sources", "k6", docsVersion)
 	if _, err := afs.Stat(filepath.Clean(versionRoot)); err != nil {
 		return fmt.Errorf("version root not found: %w", err)
@@ -97,7 +97,7 @@ func run(
 	populateChildren(sections)
 
 	// Step 5: write sections.json.
-	idx := docs.Index{
+	idx := &docs.Index{
 		Version:  k6Version,
 		Sections: sections,
 	}
@@ -406,7 +406,7 @@ func populateChildren(sections []docs.Section) {
 }
 
 // writeSectionsJSON writes the index to sections.json in the output directory.
-func writeSectionsJSON(afs fsext.Fs, outputDir string, idx docs.Index) error {
+func writeSectionsJSON(afs fsext.Fs, outputDir string, idx *docs.Index) error {
 	if err := afs.MkdirAll(outputDir, 0o750); err != nil {
 		return fmt.Errorf("create output dir: %w", err)
 	}

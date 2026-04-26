@@ -63,7 +63,7 @@ func PrepareTransform(content string, sharedContent map[string]string) string {
 //  7. Strip HTML comments
 //  8. Strip YAML frontmatter
 //  9. Normalize whitespace
-func transform(content, version string) string {
+func Transform(content, version string) string {
 	if content == "" {
 		return ""
 	}

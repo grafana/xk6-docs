@@ -1,105 +1,84 @@
 package docs
 
 import (
-	"encoding/json"
-	"fmt"
 	"iter"
-	"path/filepath"
 	"sort"
 	"strings"
-
-	"go.k6.io/k6/lib/fsext"
 )
 
-const jsAPISlug = "javascript-api"
-
-// Section represents a single documentation section.
-type Section struct {
-	Slug        string   `json:"slug"`
-	RelPath     string   `json:"rel_path"`
-	Title       string   `json:"title"`
-	Description string   `json:"description"`
-	Weight      int      `json:"weight"`
-	Category    string   `json:"category"`
-	Children    []string `json:"children"`
-	IsIndex     bool     `json:"is_index"`
-	Aliases     []string `json:"aliases,omitempty"`
-}
-
-// Index holds all sections and provides fast lookup by slug.
-type Index struct {
-	Version  string    `json:"version"`
-	Sections []Section `json:"sections"`
-	bySlug   map[string]*Section
-	byAlias  map[string]*Section
-}
-
-// Tree is a depth-limited node in a section tree.
-type Tree struct {
-	*Section
-	Children []*Tree
-}
-
-// LoadIndex reads sections.json from dir and returns a populated Index.
-func LoadIndex(afs fsext.Fs, dir string) (*Index, error) {
-	data, err := fsext.ReadFile(afs, filepath.Join(dir, "sections.json"))
-	if err != nil {
-		return nil, fmt.Errorf("load index %s: %w", dir, err)
-	}
-
-	var idx Index
-	if err := json.Unmarshal(data, &idx); err != nil {
-		return nil, fmt.Errorf("parse index %s: %w", dir, err)
-	}
-
-	idx.bySlug = make(map[string]*Section, len(idx.Sections))
-	for i := range idx.Sections {
-		idx.bySlug[idx.Sections[i].Slug] = &idx.Sections[i]
-	}
-
-	idx.byAlias = make(map[string]*Section)
-	for i := range idx.Sections {
-		for _, a := range idx.Sections[i].Aliases {
-			// Exact slug always wins over alias.
-			if _, taken := idx.bySlug[a]; taken {
-				continue
-			}
-			if _, dup := idx.byAlias[a]; dup {
-				continue
-			}
-			idx.byAlias[a] = &idx.Sections[i]
+func (idx *Index) ensureMaps() {
+	idx.initOnce.Do(func() {
+		bySlug := make(map[string]*Section, len(idx.Sections))
+		for i := range idx.Sections {
+			bySlug[idx.Sections[i].Slug] = &idx.Sections[i]
 		}
-	}
 
-	return &idx, nil
+		byAlias := make(map[string]*Section)
+		for i := range idx.Sections {
+			sec := &idx.Sections[i]
+			for _, a := range sec.Aliases {
+				// Exact slug always wins over alias.
+				if _, taken := bySlug[a]; taken {
+					continue
+				}
+				if _, dup := byAlias[a]; dup {
+					continue
+				}
+				byAlias[a] = sec
+			}
+		}
+
+		idx.byAlias = byAlias
+		idx.bySlug = bySlug
+	})
 }
 
-// Lookup returns the section with the given slug in O(1) time.
-// The lookup is case-insensitive and alias-aware: a slug match wins
-// over an alias match.
+// Lookup returns the section identified by slug. The lookup is
+// case-insensitive and alias-aware: a slug match wins over an alias match.
 func (idx *Index) Lookup(slug string) (*Section, bool) {
+	idx.ensureMaps()
 	key := strings.ToLower(slug)
 	if sec, ok := idx.bySlug[key]; ok {
-		return sec, ok
+		return sec, true
 	}
-	sec, ok := idx.byAlias[key]
-	return sec, ok
+	if sec, ok := idx.byAlias[key]; ok {
+		return sec, true
+	}
+	return nil, false
+}
+
+// Children returns the direct child sections of slug in their stored order.
+// The prepare tool sorts children by weight at build time.
+// Returns nil if slug is unknown.
+func (idx *Index) Children(slug string) []*Section {
+	idx.ensureMaps()
+	parent, ok := idx.bySlug[slug]
+	if !ok {
+		return nil
+	}
+	out := make([]*Section, 0, len(parent.Children))
+	for _, child := range parent.Children {
+		if c, ok := idx.bySlug[child]; ok {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // normalize strips separators (dashes, spaces, slashes), then lowercases.
-// This enables fuzzy matching where "close context", "close-context",
-// "close/context", and "closecontext" all compare equal.
+// This enables fuzzy matching where "k6 http get", "k6-http-get",
+// and "k6/http/get" all compare equal.
 func normalize(s string) string {
 	return strings.ToLower(strings.NewReplacer("-", "", " ", "", "/", "").Replace(s))
 }
 
-// Search returns sections whose title, description, slug, or body (via readContent)
-// contain term as a case-insensitive substring. If readContent is nil, only
-// title, description, and slug are checked.
-//
-// In addition to exact case-insensitive matching, Search performs normalized
-// matching that ignores spaces and dashes so that e.g. "close context" matches
-// "closecontext".
+// Search returns sections whose title, description, slug, or body (via
+// readContent) contain term. Matching is case-insensitive on title and
+// description, and normalized fuzzy (ignoring spaces, dashes, slashes) on
+// title, description, and slug. If readContent is non-nil, the body returned
+// by readContent(slug) is matched the same two ways. Results preserve the
+// order of idx.Sections and contain no duplicates. Returns nil for an empty
+// term.
 func (idx *Index) Search(term string, readContent func(slug string) string) []*Section {
 	if term == "" {
 		return nil
@@ -112,14 +91,12 @@ func (idx *Index) Search(term string, readContent func(slug string) string) []*S
 	for i := range idx.Sections {
 		sec := &idx.Sections[i]
 
-		// Exact case-insensitive match on title or description.
 		if strings.Contains(strings.ToLower(sec.Title), lower) ||
 			strings.Contains(strings.ToLower(sec.Description), lower) {
 			results = append(results, sec)
 			continue
 		}
 
-		// Normalized (fuzzy) match: ignore spaces and dashes.
 		if strings.Contains(normalize(sec.Title), normTerm) ||
 			strings.Contains(normalize(sec.Description), normTerm) ||
 			strings.Contains(normalize(sec.Slug), normTerm) {
@@ -129,35 +106,17 @@ func (idx *Index) Search(term string, readContent func(slug string) string) []*S
 
 		if readContent != nil {
 			body := readContent(sec.Slug)
-			if body != "" {
-				if strings.Contains(strings.ToLower(body), lower) ||
-					strings.Contains(normalize(body), normTerm) {
-					results = append(results, sec)
-				}
+			if body == "" {
+				continue
+			}
+			if strings.Contains(strings.ToLower(body), lower) ||
+				strings.Contains(normalize(body), normTerm) {
+				results = append(results, sec)
 			}
 		}
 	}
 
 	return results
-}
-
-// Children returns the direct child sections of slug in stored order.
-// The prepare tool sorts children by weight at build time.
-// Returns nil if the slug is not found.
-func (idx *Index) Children(slug string) []*Section {
-	parent, ok := idx.bySlug[slug]
-	if !ok {
-		return nil
-	}
-
-	children := make([]*Section, 0, len(parent.Children))
-	for _, childSlug := range parent.Children {
-		if child, ok := idx.bySlug[childSlug]; ok {
-			children = append(children, child)
-		}
-	}
-
-	return children
 }
 
 // TopLevel returns sections where Category == Slug (top-level indices),
@@ -207,6 +166,7 @@ func (idx *Index) Tree(rootSlug string, depth int) iter.Seq2[int, *Tree] {
 		if rootSlug == "" {
 			roots = idx.TopLevel()
 		} else {
+			idx.ensureMaps()
 			if _, ok := idx.bySlug[rootSlug]; !ok {
 				return
 			}

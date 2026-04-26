@@ -4,3 +4,6 @@ env K6_DOCS_CACHE_DIR=$WORK/cache
 env NO_COLOR=1
 ptyexec ./k6 x docs
 stdout '# k6 v1\.5\.x'
+
+-- cache/v1.5.x/sections.json --
+{"version":"v1.5.x","sections":[]}

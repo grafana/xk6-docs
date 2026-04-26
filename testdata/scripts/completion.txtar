@@ -80,5 +80,5 @@ exec ./k6 __complete x docs ''
 ! stdout 'javascript-api'
 stdout ':4'
 
--- bad-cache/sections.json --
+-- bad-cache/v0.55.x/sections.json --
 {bad json

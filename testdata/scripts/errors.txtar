@@ -8,5 +8,5 @@ env NO_COLOR=1
 ! ptyexec ./k6 x docs --cache-dir $WORK/empty-cache --version v0.55.x best-practices
 stderr 'best practices'
 
--- empty-cache/sections.json --
+-- empty-cache/v0.55.x/sections.json --
 {"version":"v0.55.x","sections":[]}

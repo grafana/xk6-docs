@@ -124,7 +124,7 @@ env K6_DOCS_VERSION=v0.55.x
 bundlesrv $WORK/bundle-perms
 exec ./k6 x docs
 checkperm 0750 $WORK/home-perms/.local/share/k6/docs/v0.55.x
-checkperm 0640 $WORK/home-perms/.local/share/k6/docs/v0.55.x/sections.json
+checkperm 0600 $WORK/home-perms/.local/share/k6/docs/v0.55.x/sections.json
 
 # Staleness: corrupt .last_check self-heals.
 env HOME=$WORK/home-corrupt-lc

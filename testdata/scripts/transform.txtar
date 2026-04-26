@@ -24,6 +24,6 @@ stdout 'Just text, nothing special'
 env NO_COLOR=1
 ptyexec ./k6 x docs --cache-dir $WORK/empty-cache --version v0.55.x empty-topic
 
--- empty-cache/sections.json --
+-- empty-cache/v0.55.x/sections.json --
 {"version":"v0.55.x","sections":[{"slug":"empty-topic","rel_path":"empty-topic.md","title":"Empty","description":"Empty.","weight":1,"category":"empty-topic","children":null,"is_index":false}]}
--- empty-cache/markdown/empty-topic.md --
+-- empty-cache/v0.55.x/markdown/empty-topic.md --

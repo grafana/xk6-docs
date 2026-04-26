@@ -2,12 +2,14 @@ package docs
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os/exec"
 	"sort"
 	"strings"
 
+	xdocs "github.com/grafana/xk6-docs/docs"
 	"github.com/spf13/cobra"
 	"go.k6.io/k6/cmd/state"
 	"golang.org/x/term"
@@ -16,22 +18,23 @@ import (
 // runCtx holds the common state prepared by prepareRun for both docs and search.
 type runCtx struct {
 	env   *docsEnv
-	idx   *Index
 	w     io.Writer
 	flush func() error
 }
 
+const defaultDepth = 1
+
 // prepareRun handles setup shared by runDocs and runSearch:
 // version/cache resolution, depth, and renderer buffering.
 func prepareRun(gs *state.GlobalState, cmd *cobra.Command, opts *docsOpts) (*runCtx, error) {
-	version, cacheDir, idx, err := setup(cmd.Context(), gs, opts.version, opts.cacheDir)
+	env, err := setup(cmd.Context(), gs, opts.version, opts.cacheDir)
 	if err != nil {
 		return nil, err
 	}
 
-	depth := defaultDepth
+	env.depth = defaultDepth
 	if opts.depth > 0 {
-		depth = opts.depth
+		env.depth = opts.depth
 	}
 
 	width := opts.width
@@ -44,8 +47,6 @@ func prepareRun(gs *state.GlobalState, cmd *cobra.Command, opts *docsOpts) (*run
 			width = defaultWidth
 		}
 	}
-
-	env := &docsEnv{FS: gs.FS, CacheDir: cacheDir, Version: version, Depth: depth}
 
 	baseW := cmd.OutOrStdout()
 	w := baseW
@@ -87,7 +88,7 @@ func prepareRun(gs *state.GlobalState, cmd *cobra.Command, opts *docsOpts) (*run
 		return renderMarkdown(gs.Stdout.Writer, buf.String(), width)
 	}
 
-	return &runCtx{env: env, idx: idx, w: w, flush: flush}, nil
+	return &runCtx{env: env, w: w, flush: flush}, nil
 }
 
 // childName returns the short name of a child relative to its parent.
@@ -128,37 +129,34 @@ func printExample(w io.Writer, example string) {
 	_, _ = fmt.Fprintf(w, "> Example: `%s`\n", example)
 }
 
-// printTree prints sections as indented bullets, recursing into children up to depth levels.
-func printTree(w io.Writer, idx *Index, items []*Section, parentSlug, indent string, depth int) {
-	if depth < 1 {
-		return
-	}
-	for _, item := range items {
-		name := childName(item.Slug, parentSlug)
-		_, _ = fmt.Fprintf(w, "%s- %s\n", indent, name)
-		if depth > 1 {
-			children := idx.Children(item.Slug)
-			printTree(w, idx, children, item.Slug, indent+"  ", depth-1)
+// writeTree prints sections as indented bullets using the Tree iterator.
+func writeTree(w io.Writer, idx *xdocs.Index, rootSlug, baseIndent string, depth int) {
+	for level, node := range idx.Tree(rootSlug, depth) {
+		parent := ""
+		if i := strings.LastIndex(node.Slug, "/"); i >= 0 {
+			parent = node.Slug[:i]
 		}
+		name := childName(node.Slug, parent)
+		_, _ = fmt.Fprintf(w, "%s- %s\n", baseIndent+strings.Repeat("  ", level), name)
 	}
 }
 
 // printSubtopics prints a subtopics block: bold header, bullet list, and example hint.
-func printSubtopics(w io.Writer, idx *Index, path string, children []*Section, parentSlug string, depth int) {
+func printSubtopics(w io.Writer, idx *xdocs.Index, path, rootSlug string, depth int) {
 	_, _ = fmt.Fprintf(w, "**%s subtopics:**\n", path)
-	printTree(w, idx, children, parentSlug, "", depth)
+	writeTree(w, idx, rootSlug, "", depth)
 	printExample(w, fmt.Sprintf("k6 x docs %s/<subtopic>", path))
 }
 
 // showDocs resolves args to a topic and prints it.
-func showDocs(env *docsEnv, w io.Writer, idx *Index, args []string) error {
+func showDocs(ctx context.Context, env *docsEnv, w io.Writer, idx *xdocs.Index, args []string) error {
 	if len(args) == 0 {
-		printTOC(w, idx, env.Version, env.Depth)
+		printTOC(w, idx, env.version, env.depth)
 		return nil
 	}
 
 	if args[0] == "best-practices" {
-		return printBestPractices(env, w)
+		return printBestPractices(ctx, env, w)
 	}
 
 	slug := resolveWithLookup(args, func(s string) bool {
@@ -171,14 +169,14 @@ func showDocs(env *docsEnv, w io.Writer, idx *Index, args []string) error {
 		return fmt.Errorf("topic not found: %s", strings.Join(args, " "))
 	}
 
-	printSection(env, w, idx, sec)
+	printSection(ctx, env, w, idx, sec)
 	return nil
 }
 
 // printTOC prints the table of contents with subtopics up to depth levels.
-func printTOC(w io.Writer, idx *Index, version string, depth int) {
+func printTOC(w io.Writer, idx *xdocs.Index, version string, depth int) {
 	_, _ = fmt.Fprintf(w, "# k6 %s\n", version)
-	printTree(w, idx, idx.TopLevel(), "", "", depth)
+	writeTree(w, idx, "", "", depth)
 	printExample(w, "k6 x docs <topic>")
 	_, _ = fmt.Fprintln(w)
 	_, _ = fmt.Fprintln(w, "> AI agent? Run `k6 x docs skill` to install the k6 docs skill.")
@@ -186,14 +184,13 @@ func printTOC(w io.Writer, idx *Index, version string, depth int) {
 
 // printSection prints a section's markdown content, read from the cache dir.
 // If the section has children, a subtopics footer is appended.
-func printSection(env *docsEnv, w io.Writer, idx *Index, section *Section) {
-	content := strings.TrimSpace(env.readAndTransform(section.RelPath))
+func printSection(ctx context.Context, env *docsEnv, w io.Writer, idx *xdocs.Index, section *xdocs.Section) {
+	content := strings.TrimSpace(env.readAndTransform(ctx, section.Slug))
 	if content != "" {
 		_, _ = fmt.Fprintln(w, content)
 	}
 
-	children := idx.Children(section.Slug)
-	if len(children) > 0 {
+	if len(section.Children) > 0 {
 		path := strings.ReplaceAll(slugToArgs(section.Slug), " ", "/")
 
 		if content != "" {
@@ -201,7 +198,7 @@ func printSection(env *docsEnv, w io.Writer, idx *Index, section *Section) {
 			_, _ = fmt.Fprintln(w, "---")
 		}
 
-		printSubtopics(w, idx, path, children, section.Slug, env.Depth)
+		printSubtopics(w, idx, path, section.Slug, env.depth)
 	}
 }
 
@@ -217,14 +214,14 @@ func searchGroupKey(slug string) string {
 
 // searchResults collects results by searching for both the raw joined
 // term and the resolved slug (shared rules: k6-prefix, parent fallback).
-func searchResults(idx *Index, args []string, readContent func(string) string) []*Section {
+func searchResults(idx *xdocs.Index, args []string, readContent func(string) string) []*xdocs.Section {
 	exists := func(s string) bool { _, ok := idx.Lookup(s); return ok }
 
 	term := strings.Join(args, "/")
 	resolved := resolveWithLookup(args, exists)
 
-	seen := make(map[string]*Section)
-	var results []*Section
+	seen := make(map[string]*xdocs.Section)
+	var results []*xdocs.Section
 	for _, t := range []string{term, resolved} {
 		for _, sec := range idx.Search(t, readContent) {
 			if seen[sec.Slug] == nil {
@@ -239,15 +236,11 @@ func searchResults(idx *Index, args []string, readContent func(string) string) [
 // printSearch prints search results as an indented tree, no descriptions.
 // Args are normalized and resolved through the same rules as docs navigation
 // so that e.g. "mod-b leaf" and "k6-mod-b/leaf" produce the same results.
-func printSearch(env *docsEnv, w io.Writer, idx *Index, args []string) {
+func printSearch(ctx context.Context, env *docsEnv, w io.Writer, idx *xdocs.Index, args []string) {
 	args = normalizeArgs(args)
 
 	readContent := func(slug string) string {
-		sec, ok := idx.Lookup(slug)
-		if !ok {
-			return ""
-		}
-		return env.readAndTransform(sec.RelPath)
+		return env.readAndTransform(ctx, slug)
 	}
 
 	results := searchResults(idx, args, readContent)
@@ -267,7 +260,7 @@ func printSearch(env *docsEnv, w io.Writer, idx *Index, args []string) {
 				best = m
 			}
 		}
-		printSection(env, w, idx, best)
+		printSection(ctx, env, w, idx, best)
 		return
 	}
 
@@ -297,8 +290,8 @@ func printSearch(env *docsEnv, w io.Writer, idx *Index, args []string) {
 }
 
 // groupSearchResults groups sections by their search group key.
-func groupSearchResults(results []*Section) (map[string][]*Section, []string) {
-	groups := make(map[string][]*Section)
+func groupSearchResults(results []*xdocs.Section) (map[string][]*xdocs.Section, []string) {
+	groups := make(map[string][]*xdocs.Section)
 	var order []string
 
 	for _, sec := range results {
@@ -315,7 +308,7 @@ func groupSearchResults(results []*Section) (map[string][]*Section, []string) {
 }
 
 // resolveGroupSlug determines the canonical slug for a search result group.
-func resolveGroupSlug(idx *Index, key string, members []*Section) string {
+func resolveGroupSlug(idx *xdocs.Index, key string, members []*xdocs.Section) string {
 	groupSlug := key
 	if _, ok := idx.Lookup("javascript-api/" + key); ok {
 		if members[0].Slug == "javascript-api/"+key || strings.HasPrefix(members[0].Slug, "javascript-api/"+key+"/") {
@@ -327,7 +320,7 @@ func resolveGroupSlug(idx *Index, key string, members []*Section) string {
 
 // printSearchChildren prints deduplicated children within a search group.
 // Returns the slug of the first child printed (for the example hint).
-func printSearchChildren(w io.Writer, idx *Index, members []*Section, groupSlug string, depth int) string {
+func printSearchChildren(w io.Writer, idx *xdocs.Index, members []*xdocs.Section, groupSlug string, depth int) string {
 	seen := make(map[string]bool)
 	var firstSlug string
 	for _, sec := range members {
@@ -340,9 +333,8 @@ func printSearchChildren(w io.Writer, idx *Index, members []*Section, groupSlug 
 		}
 		seen[name] = true
 		_, _ = fmt.Fprintf(w, "  - %s\n", name)
-		if depth > 2 {
-			children := idx.Children(sec.Slug)
-			printTree(w, idx, children, sec.Slug, "    ", depth-2)
+		if depth > 2 && len(sec.Children) > 0 {
+			writeTree(w, idx, sec.Slug, "    ", depth-2)
 		}
 		if firstSlug == "" {
 			firstSlug = sec.Slug

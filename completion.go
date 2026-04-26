@@ -1,13 +1,16 @@
 package docs
 
 import (
+	"cmp"
+	"errors"
 	"fmt"
+	"io/fs"
 	"runtime/debug"
 	"strings"
 
+	xdocs "github.com/grafana/xk6-docs/docs"
 	"github.com/spf13/cobra"
 	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/lib/fsext"
 )
 
 func newTopicCompletion(
@@ -36,7 +39,7 @@ func completionDirs(
 // setupForCompletion loads the index from the local cache without network I/O.
 // Returns the index and the resolved version. When the index is nil but
 // version is non-empty, the cache is missing for that version.
-func setupForCompletion(gs *state.GlobalState, opts *docsOpts) (*Index, string) {
+func setupForCompletion(gs *state.GlobalState, opts *docsOpts) (*xdocs.Index, string) {
 	version := opts.version
 	if version == "" {
 		version = gs.Env["K6_DOCS_VERSION"]
@@ -49,39 +52,27 @@ func setupForCompletion(gs *state.GlobalState, opts *docsOpts) (*Index, string) 
 		version = v
 	}
 
-	version = MapToWildcard(version)
+	version = xdocs.VersionWildcard(version)
 
-	docsCacheDir := opts.cacheDir
-	if docsCacheDir == "" {
-		docsCacheDir = gs.Env["K6_DOCS_CACHE_DIR"]
-	}
-	if docsCacheDir == "" {
-		dir, err := cacheDir(gs.Env, version)
-		if err != nil {
-			return nil, ""
-		}
-		docsCacheDir = dir
-	}
-
-	if !dirExists(gs.FS, docsCacheDir) {
-		return nil, version
-	}
-
-	idx, err := LoadIndex(gs.FS, docsCacheDir)
-	if err != nil {
+	base := cmp.Or(opts.cacheDir, gs.Env["K6_DOCS_CACHE_DIR"], baseCacheDir(gs))
+	if base == "" {
 		return nil, ""
+	}
+
+	cat := xdocs.NewCatalog(xdocs.WithCacheDir(base), xdocs.WithLocalOnly())
+	idx, err := cat.Index(gs.Ctx, version)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, version // cache missing: active help
+		}
+		return nil, "" // bad data: silent
 	}
 
 	return idx, version
 }
 
-func dirExists(afs fsext.Fs, path string) bool {
-	info, err := afs.Stat(path)
-	return err == nil && info.IsDir()
-}
-
 func completionTopicArgs(
-	cmd *cobra.Command, idx *Index, args []string, toComplete string,
+	cmd *cobra.Command, idx *xdocs.Index, args []string, toComplete string,
 ) ([]cobra.Completion, cobra.ShellCompDirective) {
 	if idx == nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
@@ -94,7 +85,7 @@ func completionTopicArgs(
 	return completionDeeper(idx, args, toComplete), cobra.ShellCompDirectiveNoFileComp
 }
 
-func completionFirstArg(cmd *cobra.Command, idx *Index, toComplete string) []cobra.Completion {
+func completionFirstArg(cmd *cobra.Command, idx *xdocs.Index, toComplete string) []cobra.Completion {
 	prefix := strings.ToLower(toComplete)
 	var comps []cobra.Completion
 
@@ -143,7 +134,7 @@ func completionFirstArg(cmd *cobra.Command, idx *Index, toComplete string) []cob
 	return comps
 }
 
-func completionDeeper(idx *Index, args []string, toComplete string) []cobra.Completion {
+func completionDeeper(idx *xdocs.Index, args []string, toComplete string) []cobra.Completion {
 	exists := func(s string) bool { _, ok := idx.Lookup(s); return ok }
 	slug := resolveWithLookup(args, exists)
 

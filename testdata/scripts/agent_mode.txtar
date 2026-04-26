@@ -3,7 +3,7 @@
 # No args
 exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x
 stdout '# k6 docs'
-stdout $WORK'/cache/markdown'
+stdout $WORK'/cache/v0.55.x/markdown'
 stdout 'grep -rl'
 stdout '_index.md'
 
