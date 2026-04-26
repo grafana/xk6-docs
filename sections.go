@@ -3,6 +3,7 @@ package docs
 import (
 	"encoding/json"
 	"fmt"
+	"iter"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -22,6 +23,7 @@ type Section struct {
 	Category    string   `json:"category"`
 	Children    []string `json:"children"`
 	IsIndex     bool     `json:"is_index"`
+	Aliases     []string `json:"aliases,omitempty"`
 }
 
 // Index holds all sections and provides fast lookup by slug.
@@ -29,6 +31,13 @@ type Index struct {
 	Version  string    `json:"version"`
 	Sections []Section `json:"sections"`
 	bySlug   map[string]*Section
+	byAlias  map[string]*Section
+}
+
+// Tree is a depth-limited node in a section tree.
+type Tree struct {
+	*Section
+	Children []*Tree
 }
 
 // LoadIndex reads sections.json from dir and returns a populated Index.
@@ -48,13 +57,32 @@ func LoadIndex(afs fsext.Fs, dir string) (*Index, error) {
 		idx.bySlug[idx.Sections[i].Slug] = &idx.Sections[i]
 	}
 
+	idx.byAlias = make(map[string]*Section)
+	for i := range idx.Sections {
+		for _, a := range idx.Sections[i].Aliases {
+			// Exact slug always wins over alias.
+			if _, taken := idx.bySlug[a]; taken {
+				continue
+			}
+			if _, dup := idx.byAlias[a]; dup {
+				continue
+			}
+			idx.byAlias[a] = &idx.Sections[i]
+		}
+	}
+
 	return &idx, nil
 }
 
 // Lookup returns the section with the given slug in O(1) time.
-// The lookup is case-insensitive.
+// The lookup is case-insensitive and alias-aware: a slug match wins
+// over an alias match.
 func (idx *Index) Lookup(slug string) (*Section, bool) {
-	sec, ok := idx.bySlug[strings.ToLower(slug)]
+	key := strings.ToLower(slug)
+	if sec, ok := idx.bySlug[key]; ok {
+		return sec, ok
+	}
+	sec, ok := idx.byAlias[key]
 	return sec, ok
 }
 
@@ -113,7 +141,8 @@ func (idx *Index) Search(term string, readContent func(slug string) string) []*S
 	return results
 }
 
-// Children returns the child sections of the given slug, sorted by weight.
+// Children returns the direct child sections of slug in stored order.
+// The prepare tool sorts children by weight at build time.
 // Returns nil if the slug is not found.
 func (idx *Index) Children(slug string) []*Section {
 	parent, ok := idx.bySlug[slug]
@@ -127,10 +156,6 @@ func (idx *Index) Children(slug string) []*Section {
 			children = append(children, child)
 		}
 	}
-
-	sort.Slice(children, func(i, j int) bool {
-		return children[i].Weight < children[j].Weight
-	})
 
 	return children
 }
@@ -151,4 +176,78 @@ func (idx *Index) TopLevel() []*Section {
 	})
 
 	return top
+}
+
+// ByCategory returns sections whose Category equals category,
+// preserving the order in idx.Sections.
+func (idx *Index) ByCategory(category string) []*Section {
+	var out []*Section
+	for i := range idx.Sections {
+		sec := &idx.Sections[i]
+		if sec.Category == category {
+			out = append(out, sec)
+		}
+	}
+	return out
+}
+
+// Tree iterates the section tree rooted at rootSlug, depth-first.
+// When rootSlug is empty, iteration starts at the top-level sections.
+// Otherwise iteration starts at the children of rootSlug; the root itself
+// is not yielded. Each yielded *Tree has its Children populated only down
+// to the requested depth. If depth < 1 or rootSlug is unknown, nothing is
+// yielded.
+func (idx *Index) Tree(rootSlug string, depth int) iter.Seq2[int, *Tree] {
+	return func(yield func(int, *Tree) bool) {
+		if depth < 1 {
+			return
+		}
+
+		var roots []*Section
+		if rootSlug == "" {
+			roots = idx.TopLevel()
+		} else {
+			if _, ok := idx.bySlug[rootSlug]; !ok {
+				return
+			}
+			roots = idx.Children(rootSlug)
+		}
+
+		sort.SliceStable(roots, func(i, j int) bool {
+			if roots[i].Weight != roots[j].Weight {
+				return roots[i].Weight < roots[j].Weight
+			}
+			return roots[i].Slug < roots[j].Slug
+		})
+
+		for _, sec := range roots {
+			t := idx.buildTree(sec, depth)
+			if !walkTree(t, 0, yield) {
+				return
+			}
+		}
+	}
+}
+
+func (idx *Index) buildTree(sec *Section, depth int) *Tree {
+	t := &Tree{Section: sec}
+	if depth <= 1 {
+		return t
+	}
+	for _, child := range idx.Children(sec.Slug) {
+		t.Children = append(t.Children, idx.buildTree(child, depth-1))
+	}
+	return t
+}
+
+func walkTree(t *Tree, level int, yield func(int, *Tree) bool) bool {
+	if !yield(level, t) {
+		return false
+	}
+	for _, child := range t.Children {
+		if !walkTree(child, level+1, yield) {
+			return false
+		}
+	}
+	return true
 }

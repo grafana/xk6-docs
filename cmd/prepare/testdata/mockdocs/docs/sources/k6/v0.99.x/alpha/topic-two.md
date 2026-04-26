@@ -3,6 +3,9 @@ title: 'TopicTwo'
 description: 'TopicTwo items validate boolean conditions.'
 description: 'Duplicate description that should be ignored.'
 weight: 400
+aliases:
+  - ../legacy/checks
+  - ./old-topic-two
 ---
 
 # TopicTwo

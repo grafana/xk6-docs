@@ -34,3 +34,8 @@ env NO_COLOR=1
 ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x lib-c
 stdout '# lib-c'
 stdout 'Utility library'
+
+# Alias lookup resolves to the real section
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x old-delta
+stdout 'Delta category'

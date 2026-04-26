@@ -14,6 +14,10 @@ grep 'alpha' $WORK/out/sections.json
 grep 'alpha/topic-two' $WORK/out/sections.json
 grep 'alpha/topic-three' $WORK/out/sections.json
 
+# Aliases stored from frontmatter.
+grep '../legacy/checks' $WORK/out/sections.json
+grep './old-topic-two' $WORK/out/sections.json
+
 # Shared content excluded as a category.
 ! grep '"category": "shared"' $WORK/out/sections.json
 

@@ -27,9 +27,10 @@ import (
 
 // frontmatter holds the YAML fields we extract from each doc file.
 type frontmatter struct {
-	Title       string `yaml:"title"`
-	Description string `yaml:"description"`
-	Weight      int    `yaml:"weight"`
+	Title       string   `yaml:"title"`
+	Description string   `yaml:"description"`
+	Weight      int      `yaml:"weight"`
+	Aliases     []string `yaml:"aliases"`
 }
 
 func main() {
@@ -335,6 +336,7 @@ func processEntry(
 		Weight:      fm.Weight,
 		Category:    category,
 		IsIndex:     isIndex,
+		Aliases:     fm.Aliases,
 	}
 
 	// Handle slug collisions: prefer _index.md over plain .md files.
