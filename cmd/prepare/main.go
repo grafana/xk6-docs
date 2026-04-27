@@ -336,7 +336,7 @@ func processEntry(
 		Weight:      fm.Weight,
 		Category:    category,
 		IsIndex:     isIndex,
-		Aliases:     fm.Aliases,
+		Aliases:     resolveAliases(slug, fm.Aliases),
 	}
 
 	// Handle slug collisions: prefer _index.md over plain .md files.
@@ -350,6 +350,27 @@ func processEntry(
 	}
 
 	return nil
+}
+
+// resolveAliases converts relative Hugo aliases into absolute slugs.
+// Hugo aliases are relative to the page's parent directory, e.g. a page at
+// "alpha/topic-two" with alias "../legacy/checks" resolves to "legacy/checks".
+func resolveAliases(slug string, raw []string) []string {
+	if len(raw) == 0 {
+		return nil
+	}
+	parentDir := filepath.ToSlash(filepath.Dir(slug))
+	resolved := make([]string, 0, len(raw))
+	for _, a := range raw {
+		a = strings.TrimSuffix(strings.TrimSpace(a), "/")
+		if a == "" {
+			continue
+		}
+		joined := filepath.Join(parentDir, a)
+		cleaned := filepath.ToSlash(filepath.Clean(joined))
+		resolved = append(resolved, cleaned)
+	}
+	return resolved
 }
 
 // populateChildren sets the Children field for each _index section.
