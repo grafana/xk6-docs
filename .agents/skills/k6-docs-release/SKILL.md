@@ -115,6 +115,8 @@ Example from `v0.0.5` (PR #191):
 
 Post to `#k6-changelog` using the slack skill. Only list features, not bug fixes or maintenance. Always wrap technical terms in backticks. Link each commit hash.
 
+Treat architectural changes that expand who can use the project as features. New shared modules, new public APIs, new integration points — these are headline news, not "internal improvements." If `mcp-k6` or another consumer can do something new because of this release, lead with it.
+
 Use plain Markdown — `[text](url)` for links, `*` for bullets. Do NOT use Slack's older `<url|text>` mrkdwn syntax or `-` bullets; the channel renders Markdown.
 
 When passing the message to `reply.py`, use a single-quoted heredoc to avoid shell-escaping backticks. Backslash-escaped backticks (`` \` ``) leak through verbatim into the message body and look like garbage.
