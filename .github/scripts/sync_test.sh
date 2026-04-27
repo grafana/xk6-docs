@@ -163,27 +163,27 @@ set_docs_date "v1.7.x" "2026-03-25T09:00:00Z"
 RESULT=$(run_sync)
 assert_eq "files in listing skipped" "v1.7.x" "$RESULT"
 
-# --- Test: versions below v1.5.x skipped ---
+# --- Test: versions below v0.47.x skipped ---
 
 setup_test
-set_folders "v0.52.x" "dir" "v1.4.x" "dir" "v1.5.x" "dir"
+set_folders "v0.40.x" "dir" "v0.46.x" "dir" "v0.47.x" "dir"
 set_assets
-set_docs_date "v0.52.x" "2026-02-26T11:00:00Z"
-set_docs_date "v1.4.x" "2026-03-18T09:00:00Z"
-set_docs_date "v1.5.x" "2026-03-18T09:00:00Z"
+set_docs_date "v0.40.x" "2026-02-26T11:00:00Z"
+set_docs_date "v0.46.x" "2026-03-18T09:00:00Z"
+set_docs_date "v0.47.x" "2026-03-18T09:00:00Z"
 
 RESULT=$(run_sync)
-assert_eq "old versions skipped" "v1.5.x" "$RESULT"
+assert_eq "old versions skipped" "v0.47.x" "$RESULT"
 
 # --- Test: real-world scenario (the v1.7.0 bug) ---
 
 setup_test
-set_folders "next" "dir" "v0.52.x" "dir" "v1.4.x" "dir" \
+set_folders "next" "dir" "v0.40.x" "dir" "v0.46.x" "dir" \
             "v1.5.x" "dir" "v1.6.x" "dir" "v1.7.x" "dir"
 set_assets "docs-v1.5.x.tar.zst" "2026-03-19T03:55:34Z" \
            "docs-v1.6.x.tar.zst" "2026-03-19T03:55:39Z"
-set_docs_date "v0.52.x" "2026-02-26T11:00:00Z"
-set_docs_date "v1.4.x" "2026-03-18T09:00:00Z"
+set_docs_date "v0.40.x" "2026-02-26T11:00:00Z"
+set_docs_date "v0.46.x" "2026-03-18T09:00:00Z"
 set_docs_date "v1.5.x" "2026-03-18T09:00:00Z"
 set_docs_date "v1.6.x" "2026-03-18T09:00:00Z"
 set_docs_date "v1.7.x" "2026-03-25T09:00:00Z"
