@@ -161,6 +161,8 @@ github.com/grafana/sobek v0.0.0-20251124090928-9a028a30ff58 h1:Mk4SXbmvIW1zMUzyW
 github.com/grafana/sobek v0.0.0-20251124090928-9a028a30ff58/go.mod h1:YtuqiJX1W3XvRSilL/kUZzduJG3phPJWyzM9DiIEfBo=
 github.com/grafana/xk6-dashboard v0.7.13 h1:jYD0zbxrYgz3hckRgoZ8nbd6AXYZhFvJk4WCdcMVvFw=
 github.com/grafana/xk6-dashboard v0.7.13/go.mod h1:D+k5+Nf836MHpELDqGxUs9eCRAOYE+d5HYM9zDwdILw=
+github.com/grafana/xk6-docs/docs v0.1.0 h1:2f9S1qF/VeF9kG+tcLGrI6UMkoQRSSSj45GkDeJX80E=
+github.com/grafana/xk6-docs/docs v0.1.0/go.mod h1:IBgZ0BW2xy2hhKaI+pGd/n4Gvi4FfUdR0/YQAVmKYUU=
 github.com/grafana/xk6-redis v0.3.6 h1:RS7AZwiHqIxU2gb4PxkZnqspI75xffRSKKldc6znjIg=
 github.com/grafana/xk6-redis v0.3.6/go.mod h1:wvauBdzoa0ZPUdLPQaucxppNC5Df6fIFwkg2ge/BG9g=
 github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 h1:UH//fgunKIs4JdUbpDl1VZCDaL56wXCB/5+wF6uHfaI=
