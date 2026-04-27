@@ -368,6 +368,10 @@ func resolveAliases(slug string, raw []string) []string {
 		}
 		joined := filepath.Join(parentDir, a)
 		cleaned := filepath.ToSlash(filepath.Clean(joined))
+		// Strip leading "../" — aliases can't escape the doc root.
+		for strings.HasPrefix(cleaned, "../") {
+			cleaned = cleaned[3:]
+		}
 		resolved = append(resolved, cleaned)
 	}
 	return resolved

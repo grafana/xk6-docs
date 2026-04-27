@@ -20,6 +20,9 @@ grep 'legacy/checks' $WORK/out/sections.json
 ! grep '\./' $WORK/out/sections.json
 grep 'alpha/old-topic-two' $WORK/out/sections.json
 
+# Root-level alias: ../old-alpha on "alpha" resolves to "old-alpha" (not "../old-alpha").
+grep 'old-alpha' $WORK/out/sections.json
+
 # Shared content excluded as a category.
 ! grep '"category": "shared"' $WORK/out/sections.json
 
