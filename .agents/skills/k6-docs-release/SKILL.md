@@ -97,12 +97,14 @@ If this returns JSON with the version and timestamp, the proxy has it. If not, w
 
 Clone or checkout `grafana/k6-extension-registry`. Add the new version to the `versions` list under the `github.com/grafana/xk6-docs` entry in `registry.yaml`.
 
-Create a PR, then merge it directly — no review needed:
+Create a PR on a feature branch:
 
     gh pr create --repo grafana/k6-extension-registry \
+      --base main --head add-xk6-docs-v<VERSION> \
       --title "Add xk6-docs v<VERSION>" \
       --body "Add [v<VERSION>](https://github.com/grafana/xk6-docs/releases/tag/v<VERSION>) of \`xk6-docs\` to the registry."
-    gh pr merge --repo grafana/k6-extension-registry --squash
+
+The registry now requires review before merge — direct merge is no longer allowed by repo policy. Leave the PR open and ping a reviewer (or wait for an existing approver). The release is still usable via `xk6 build` immediately; provisioning via `k6 x docs` only updates after the PR is merged.
 
 Example from `v0.0.5` (PR #191):
 
@@ -145,5 +147,5 @@ Before telling the user the release is done, verify:
 - [ ] Tag pushed and release workflow completed
 - [ ] GitHub release has binaries + checksums + description
 - [ ] Go module proxy has the version
-- [ ] Registry PR opened and merged
+- [ ] Registry PR opened (merge handled separately by a reviewer)
 - [ ] Slack message posted to `#k6-changelog`
