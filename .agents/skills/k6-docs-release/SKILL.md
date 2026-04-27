@@ -115,14 +115,18 @@ Example from `v0.0.5` (PR #191):
 
 Post to `#k6-changelog` using the slack skill. Only list features, not bug fixes or maintenance. Always wrap technical terms in backticks. Link each commit hash.
 
+Use plain Markdown — `[text](url)` for links, `*` for bullets. Do NOT use Slack's older `<url|text>` mrkdwn syntax or `-` bullets; the channel renders Markdown.
+
+When passing the message to `reply.py`, use a single-quoted heredoc to avoid shell-escaping backticks. Backslash-escaped backticks (`` \` ``) leak through verbatim into the message body and look like garbage.
+
 Format:
 
     :k6_party: *xk6-docs <VERSION> is released*
 
     > CLI k6 docs for AI agents and users.
 
-    - Feature description ([short-hash](commit-url))
-    - Feature description ([short-hash](commit-url))
+    * Feature description ([short-hash](commit-url))
+    * Feature description ([short-hash](commit-url))
 
     See the [complete release notes](https://github.com/grafana/xk6-docs/releases/tag/v<VERSION>).
 
@@ -132,10 +136,10 @@ Example from `v0.0.5`:
 
     > CLI k6 docs for AI agents and users.
 
-    - Press `Tab` to complete topic names as you type. Works with `zsh`, `bash`, `fish`, and PowerShell (243f99f)
-    - Scroll long pages in your pager with `-p`/`--pager`. Defaults to `less -r`, or honors `$PAGER` (2da4247)
-    - Set the line width with `-w`/`--width`. Defaults to your terminal width, or 80 columns. (4878d6f)
-    - When search finds results in a single group, you see the best match directly instead of a result list (047806a)
+    * Press `Tab` to complete topic names as you type. Works with `zsh`, `bash`, `fish`, and PowerShell ([243f99f](https://github.com/grafana/xk6-docs/commit/243f99f))
+    * Scroll long pages in your pager with `-p`/`--pager`. Defaults to `less -r`, or honors `$PAGER` ([2da4247](https://github.com/grafana/xk6-docs/commit/2da4247))
+    * Set the line width with `-w`/`--width`. Defaults to your terminal width, or 80 columns ([4878d6f](https://github.com/grafana/xk6-docs/commit/4878d6f))
+    * When search finds results in a single group, you see the best match directly instead of a result list ([047806a](https://github.com/grafana/xk6-docs/commit/047806a))
 
     See the [complete release notes](https://github.com/grafana/xk6-docs/releases/tag/v0.0.5).
 
