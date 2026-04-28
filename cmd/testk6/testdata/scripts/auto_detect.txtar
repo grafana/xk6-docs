@@ -1,0 +1,9 @@
+# Auto-detect from build info succeeds with the real k6 binary.
+# setupautodetect reads the binary's build info, wildcards the k6 version,
+# and creates a matching cache directory so the test works regardless of
+# which k6 version is in go.mod.
+env K6_DOCS_CACHE_DIR=$WORK/cache
+env NO_COLOR=1
+setupautodetect ./k6 cache
+ptyexec ./k6 x docs
+stdout '# k6 v[0-9]+\.[0-9]+\.x'

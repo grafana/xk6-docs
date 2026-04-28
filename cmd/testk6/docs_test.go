@@ -1,53 +1,48 @@
-package docs
+package main
 
 import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/creack/pty"
+	docs "github.com/grafana/xk6-docs/docs"
 	"github.com/klauspost/compress/zstd"
 	"github.com/rogpeppe/go-internal/testscript"
 )
 
-// testBinary is the path to the real k6 binary built from cmd/testk6.
-// Set by TestMain before any tests run.
-var testBinary string //nolint:gochecknoglobals
-
-func TestMain(m *testing.M) {
-	testBinary = buildTestBinary()
-	os.Exit(m.Run())
-}
-
 // buildTestBinary builds cmd/testk6 once and caches the result under the
 // Go build cache directory. Subsequent runs reuse the cached binary if
 // the source hasn't changed (checked via go build's own staleness logic).
-func buildTestBinary() string {
+func buildTestBinary(ctx context.Context, t *testing.T) string {
+	t.Helper()
+
 	cacheDir, err := os.UserCacheDir()
 	if err != nil {
-		log.Fatalf("cache dir: %v", err)
+		t.Fatalf("cache dir: %v", err)
 	}
 	dir := filepath.Join(cacheDir, "xk6-docs-test")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		log.Fatalf("mkdir: %v", err)
+		t.Fatalf("mkdir: %v", err)
 	}
 
 	bin := filepath.Join(dir, "k6")
-	build := exec.CommandContext(context.Background(), "go", "build", "-o", bin, "./cmd/testk6")
+	build := exec.CommandContext(ctx, "go", "build", "-o", bin, ".")
 	out, err := build.CombinedOutput()
 	if err != nil {
-		log.Fatalf("build testk6: %v\n%s", err, out)
+		t.Fatalf("build testk6: %v\n%s", err, out)
 	}
 	return bin
 }
@@ -55,16 +50,21 @@ func buildTestBinary() string {
 func TestScripts(t *testing.T) {
 	t.Parallel()
 
+	ctx := t.Context()
+	bin := buildTestBinary(ctx, t)
+
 	testscript.Run(t, testscript.Params{
 		Dir: "testdata/scripts",
 		Setup: func(env *testscript.Env) error {
-			if err := os.Symlink(testBinary, filepath.Join(env.WorkDir, "k6")); err != nil {
+			if err := os.Symlink(bin, filepath.Join(env.WorkDir, "k6")); err != nil {
 				return err
 			}
 			return copyDir("testdata/cache", filepath.Join(env.WorkDir, "cache"))
 		},
 		Cmds: map[string]func(ts *testscript.TestScript, neg bool, args []string){
-			"ptyexec":            runPtyExec,
+			"ptyexec": func(ts *testscript.TestScript, neg bool, args []string) {
+				runPtyExec(ctx, ts, neg, args)
+			},
 			"linecountgt":        runLinecountGt,
 			"cpdir":              runCpdir,
 			"bundlesrv":          runBundleSrv,
@@ -72,6 +72,9 @@ func TestScripts(t *testing.T) {
 			"checkperm":          runCheckPerm,
 			"mkzeroes":           runMkZeroes,
 			"containslines":      runContainsLines,
+			"setupautodetect": func(ts *testscript.TestScript, neg bool, args []string) {
+				runSetupAutoDetect(ctx, ts, neg, args)
+			},
 		},
 		UpdateScripts: os.Getenv("UPDATE_GOLDEN") != "",
 	})
@@ -80,13 +83,13 @@ func TestScripts(t *testing.T) {
 // runPtyExec runs a command with stdout attached to a PTY so the subprocess
 // sees a real terminal (isatty returns true). Stderr is captured separately.
 // Usage: ptyexec <prog> <args...>
-func runPtyExec(ts *testscript.TestScript, neg bool, args []string) {
+func runPtyExec(ctx context.Context, ts *testscript.TestScript, neg bool, args []string) {
 	if len(args) < 1 {
 		ts.Fatalf("usage: ptyexec <prog> <args...>")
 	}
 
 	prog := ts.MkAbs(args[0])
-	cmd := exec.CommandContext(context.Background(), prog, args[1:]...)
+	cmd := exec.CommandContext(ctx, prog, args[1:]...)
 	cmd.Env = ptyEnv(ts)
 	cmd.Dir = ts.Getenv("WORK")
 
@@ -472,4 +475,48 @@ func copyDir(src, dst string) error {
 		}
 		return os.WriteFile(target, content, 0o644)
 	})
+}
+
+// runSetupAutoDetect creates a cache directory matching the k6 version
+// detected from the test binary's build info. This makes the auto_detect
+// test independent of which k6 version is in go.mod.
+// Usage: setupautodetect <binary> <cache-dir>
+func runSetupAutoDetect(ctx context.Context, ts *testscript.TestScript, _ bool, args []string) {
+	if len(args) != 2 {
+		ts.Fatalf("usage: setupautodetect <binary> <cache-dir>")
+	}
+	binary := ts.MkAbs(args[0])
+	cacheDir := ts.MkAbs(args[1])
+
+	out, err := exec.CommandContext(ctx, "go", "version", "-m", binary).Output()
+	if err != nil {
+		ts.Fatalf("go version -m: %v", err)
+	}
+
+	k6ModPath := regexp.MustCompile(`^go\.k6\.io/k6(/v[1-9][0-9]*)?$`)
+	var version string
+	for line := range strings.SplitSeq(string(out), "\n") {
+		fields := strings.Fields(strings.TrimSpace(line))
+		if len(fields) >= 3 && fields[0] == "dep" && k6ModPath.MatchString(fields[1]) {
+			version = docs.VersionWildcard(fields[2])
+			break
+		}
+	}
+	if version == "" {
+		ts.Fatalf("go.k6.io/k6 not found in build info of %s", binary)
+	}
+
+	dir := filepath.Join(cacheDir, version)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		ts.Fatalf("mkdir: %v", err)
+	}
+
+	data := fmt.Appendf(nil, `{"version":%q,"sections":[]}`, version)
+
+	if err := os.WriteFile(filepath.Join(dir, "sections.json"), data, 0o644); err != nil {
+		ts.Fatalf("write sections.json: %v", err)
+	}
+
+	ts.Setenv("K6_AUTO_VERSION", version)
+	_, _ = fmt.Fprintf(ts.Stdout(), "%s\n", version)
 }

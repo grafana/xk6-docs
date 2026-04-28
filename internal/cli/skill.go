@@ -1,4 +1,4 @@
-package docs
+package cli
 
 import (
 	"embed"
@@ -7,8 +7,6 @@ import (
 	"io/fs"
 	"path/filepath"
 	"strings"
-
-	"go.k6.io/k6/lib/fsext"
 )
 
 //go:embed skills/xk6-docs
@@ -21,9 +19,9 @@ const (
 
 // installSkill copies the embedded skill files into destDir/xk6-docs/,
 // replacing the <binary> placeholder in SKILL.md with the given path.
-func installSkill(afs fsext.Fs, destDir, binaryPath string) error {
+func installSkill(wfs FS, destDir, binaryPath string) error {
 	skillDir := filepath.Join(destDir, skillSubdir)
-	if err := afs.RemoveAll(skillDir); err != nil {
+	if err := wfs.RemoveAll(skillDir); err != nil {
 		return fmt.Errorf("clean skill dir: %w", err)
 	}
 
@@ -39,7 +37,7 @@ func installSkill(afs fsext.Fs, destDir, binaryPath string) error {
 		target := filepath.Join(skillDir, rel)
 
 		if d.IsDir() {
-			return afs.MkdirAll(target, 0o750)
+			return wfs.MkdirAll(target, 0o750)
 		}
 
 		data, err := skillFiles.ReadFile(path)
@@ -51,7 +49,7 @@ func installSkill(afs fsext.Fs, destDir, binaryPath string) error {
 			data = []byte(strings.ReplaceAll(string(data), binaryPlaceholder, binaryPath))
 		}
 
-		if err := afs.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+		if err := wfs.MkdirAll(filepath.Dir(target), 0o750); err != nil {
 			return err
 		}
 
@@ -59,7 +57,7 @@ func installSkill(afs fsext.Fs, destDir, binaryPath string) error {
 		if strings.HasSuffix(d.Name(), ".sh") {
 			perm = 0o750
 		}
-		return fsext.WriteFile(afs, target, data, perm)
+		return wfs.WriteFile(target, data, perm)
 	})
 }
 
@@ -98,7 +96,7 @@ func skillHelpTable(cmdName string) string {
 	return b.String()
 }
 
-func runSkill(afs fsext.Fs, w io.Writer, isTTY bool, binaryPath string, args []string) error {
+func runSkill(wfs FS, w io.Writer, isTTY bool, binaryPath string, args []string) error {
 	if len(args) == 0 {
 		cmdName := filepath.Base(binaryPath)
 		table := skillHelpTable(cmdName)
@@ -116,7 +114,7 @@ func runSkill(afs fsext.Fs, w io.Writer, isTTY bool, binaryPath string, args []s
 		return fmt.Errorf("resolve binary path: %w", err)
 	}
 
-	if err := installSkill(afs, destDir, absPath); err != nil {
+	if err := installSkill(wfs, destDir, absPath); err != nil {
 		return err
 	}
 

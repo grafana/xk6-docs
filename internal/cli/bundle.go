@@ -1,4 +1,4 @@
-package docs
+package cli
 
 import (
 	"cmp"
@@ -10,14 +10,13 @@ import (
 	"strings"
 	"time"
 
-	xdocs "github.com/grafana/xk6-docs/docs"
-	"go.k6.io/k6/cmd/state"
+	"github.com/grafana/xk6-docs/docs"
 )
 
 // docsEnv bundles the context needed for reading and transforming docs.
 type docsEnv struct {
-	cat      *xdocs.Catalog
-	idx      *xdocs.Index
+	cat      *docs.Catalog
+	idx      *docs.Index
 	version  string
 	depth    int
 	cacheDir string // resolved version dir path for agent guide
@@ -28,16 +27,20 @@ func (env *docsEnv) readAndTransform(ctx context.Context, slug string) string {
 	if err != nil {
 		return ""
 	}
-	return xdocs.Transform(string(data), env.version)
+	return docs.Transform(string(data), env.version)
 }
 
 // setup resolves the version, ensures docs are cached, and loads the index.
 func setup(
-	ctx context.Context, gs *state.GlobalState, versionFlag, cacheDirFlg string,
-) (env *docsEnv, err error) {
+	ctx context.Context,
+	env map[string]string,
+	logf func(string, ...any),
+	fs FS,
+	versionFlag, cacheDirFlg string,
+) (denv *docsEnv, err error) {
 	version := versionFlag
 	if version == "" {
-		version = gs.Env["K6_DOCS_VERSION"]
+		version = env["K6_DOCS_VERSION"]
 	}
 	if version == "" {
 		version, err = detectK6Version(debug.ReadBuildInfo)
@@ -45,21 +48,21 @@ func setup(
 			return nil, fmt.Errorf("detect k6 version: %w", err)
 		}
 	}
-	version = xdocs.VersionWildcard(version)
+	version = docs.VersionWildcard(version)
 
-	explicitDir := cmp.Or(cacheDirFlg, gs.Env["K6_DOCS_CACHE_DIR"])
-	base := cmp.Or(explicitDir, baseCacheDir(gs))
+	explicitDir := cmp.Or(cacheDirFlg, env["K6_DOCS_CACHE_DIR"])
+	base := cmp.Or(explicitDir, baseCacheDir(env))
 	if base == "" {
 		return nil, fmt.Errorf("neither HOME nor USERPROFILE is set")
 	}
 
-	opts := catalogOpts(gs, base, explicitDir != "")
-	cat := xdocs.NewCatalog(opts...)
+	opts := catalogOpts(env, base, explicitDir != "")
+	cat := docs.NewCatalog(opts...)
 
 	if explicitDir == "" {
-		info, statErr := gs.FS.Stat(filepath.Join(base, version))
+		info, statErr := fs.Stat(filepath.Join(base, version))
 		if statErr != nil || !info.IsDir() {
-			gs.Logger.Infof("Downloading k6 %s docs...", version)
+			logf("Downloading k6 %s docs...", version)
 		}
 	}
 
@@ -71,25 +74,25 @@ func setup(
 	return &docsEnv{cat: cat, idx: idx, version: version, cacheDir: filepath.Join(base, version)}, nil
 }
 
-func catalogOpts(gs *state.GlobalState, base string, localOnly bool) []xdocs.Option {
-	opts := []xdocs.Option{xdocs.WithCacheDir(base)}
+func catalogOpts(env map[string]string, base string, localOnly bool) []docs.Option {
+	opts := []docs.Option{docs.WithCacheDir(base)}
 	if localOnly {
-		return append(opts, xdocs.WithLocalOnly())
+		return append(opts, docs.WithLocalOnly())
 	}
-	if t := gs.Env["K6_DOCS_REFRESH_TIMEOUT"]; t != "" {
+	if t := env["K6_DOCS_REFRESH_TIMEOUT"]; t != "" {
 		if d, err := time.ParseDuration(t); err == nil && d > 0 {
-			opts = append(opts, xdocs.WithRefreshTimeout(d))
+			opts = append(opts, docs.WithRefreshTimeout(d))
 		}
 	}
-	if u := gs.Env["K6_DOCS_BUNDLE_URL"]; u != "" {
-		opts = append(opts, xdocs.WithBundleURL(u))
+	if u := env["K6_DOCS_BUNDLE_URL"]; u != "" {
+		opts = append(opts, docs.WithBundleURL(u))
 	}
 	return opts
 }
 
 // baseCacheDir returns the doc cache base directory from HOME/USERPROFILE.
-func baseCacheDir(gs *state.GlobalState) string {
-	home := cmp.Or(gs.Env["HOME"], gs.Env["USERPROFILE"])
+func baseCacheDir(env map[string]string) string {
+	home := cmp.Or(env["HOME"], env["USERPROFILE"])
 	if home == "" {
 		return ""
 	}
@@ -102,7 +105,7 @@ func printBestPractices(ctx context.Context, env *docsEnv, w io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("read best practices: %w", err)
 	}
-	content := xdocs.Transform(string(data), env.version)
+	content := docs.Transform(string(data), env.version)
 	_, _ = fmt.Fprint(w, content)
 	if !strings.HasSuffix(content, "\n") {
 		_, _ = fmt.Fprintln(w)

@@ -1,35 +1,19 @@
-package docs
+package cli
 
 import (
 	"cmp"
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
 	"runtime/debug"
 	"strings"
 
-	xdocs "github.com/grafana/xk6-docs/docs"
+	"github.com/grafana/xk6-docs/docs"
 	"github.com/spf13/cobra"
-	"go.k6.io/k6/cmd/state"
 )
 
-func newTopicCompletion(
-	gs *state.GlobalState, opts *docsOpts,
-) func(*cobra.Command, []string, string) ([]cobra.Completion, cobra.ShellCompDirective) {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
-		idx, version := setupForCompletion(gs, opts)
-		if idx == nil && version != "" && gs.Flags.AutoExtensionResolution {
-			msg := fmt.Sprintf("Press ENTER to load the k6 %s docs for completions to work.", version)
-			comps := cobra.AppendActiveHelp(nil, msg)
-			return comps, cobra.ShellCompDirectiveNoFileComp
-		}
-		if idx == nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		return completionTopicArgs(cmd, idx, args, toComplete)
-	}
-}
-
+// completionDirs is a ValidArgsFunction that returns directory completions.
 func completionDirs(
 	_ *cobra.Command, _ []string, _ string,
 ) ([]cobra.Completion, cobra.ShellCompDirective) {
@@ -39,10 +23,12 @@ func completionDirs(
 // setupForCompletion loads the index from the local cache without network I/O.
 // Returns the index and the resolved version. When the index is nil but
 // version is non-empty, the cache is missing for that version.
-func setupForCompletion(gs *state.GlobalState, opts *docsOpts) (*xdocs.Index, string) {
+func setupForCompletion(
+	ctx context.Context, env map[string]string, opts *docsOpts,
+) (*docs.Index, string) {
 	version := opts.version
 	if version == "" {
-		version = gs.Env["K6_DOCS_VERSION"]
+		version = env["K6_DOCS_VERSION"]
 	}
 	if version == "" {
 		v, err := detectK6Version(debug.ReadBuildInfo)
@@ -52,15 +38,15 @@ func setupForCompletion(gs *state.GlobalState, opts *docsOpts) (*xdocs.Index, st
 		version = v
 	}
 
-	version = xdocs.VersionWildcard(version)
+	version = docs.VersionWildcard(version)
 
-	base := cmp.Or(opts.cacheDir, gs.Env["K6_DOCS_CACHE_DIR"], baseCacheDir(gs))
+	base := cmp.Or(opts.cacheDir, env["K6_DOCS_CACHE_DIR"], baseCacheDir(env))
 	if base == "" {
 		return nil, ""
 	}
 
-	cat := xdocs.NewCatalog(xdocs.WithCacheDir(base), xdocs.WithLocalOnly())
-	idx, err := cat.Index(gs.Ctx, version)
+	cat := docs.NewCatalog(docs.WithCacheDir(base), docs.WithLocalOnly())
+	idx, err := cat.Index(ctx, version)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil, version // cache missing: active help
@@ -72,7 +58,7 @@ func setupForCompletion(gs *state.GlobalState, opts *docsOpts) (*xdocs.Index, st
 }
 
 func completionTopicArgs(
-	cmd *cobra.Command, idx *xdocs.Index, args []string, toComplete string,
+	cmd *cobra.Command, idx *docs.Index, args []string, toComplete string,
 ) ([]cobra.Completion, cobra.ShellCompDirective) {
 	if idx == nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
@@ -85,12 +71,10 @@ func completionTopicArgs(
 	return completionDeeper(idx, args, toComplete), cobra.ShellCompDirectiveNoFileComp
 }
 
-func completionFirstArg(cmd *cobra.Command, idx *xdocs.Index, toComplete string) []cobra.Completion {
+func completionFirstArg(cmd *cobra.Command, idx *docs.Index, toComplete string) []cobra.Completion {
 	prefix := strings.ToLower(toComplete)
 	var comps []cobra.Completion
 
-	// Add subcommands (hidden from cobra to suppress them when cache
-	// is missing, so we add them here when the cache is ready).
 	for _, sub := range cmd.Commands() {
 		if !strings.HasPrefix(sub.Name(), prefix) {
 			continue
@@ -134,7 +118,7 @@ func completionFirstArg(cmd *cobra.Command, idx *xdocs.Index, toComplete string)
 	return comps
 }
 
-func completionDeeper(idx *xdocs.Index, args []string, toComplete string) []cobra.Completion {
+func completionDeeper(idx *docs.Index, args []string, toComplete string) []cobra.Completion {
 	exists := func(s string) bool { _, ok := idx.Lookup(s); return ok }
 	slug := resolveWithLookup(args, exists)
 

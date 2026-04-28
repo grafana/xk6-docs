@@ -1,11 +1,11 @@
-package docs
+package cli
 
 import (
 	"errors"
 	"regexp"
 	"runtime/debug"
 
-	xdocs "github.com/grafana/xk6-docs/docs"
+	"github.com/grafana/xk6-docs/docs"
 )
 
 // detectK6Version reads build info using the provided function and returns the
@@ -20,7 +20,7 @@ func detectK6Version(readBuildInfo func() (*debug.BuildInfo, bool)) (string, err
 
 	for _, dep := range info.Deps {
 		if k6ModuleRe.MatchString(dep.Path) {
-			return xdocs.VersionWildcard(dep.Version), nil
+			return docs.VersionWildcard(dep.Version), nil
 		}
 	}
 

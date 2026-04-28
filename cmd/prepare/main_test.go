@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,31 +10,24 @@ import (
 	"github.com/rogpeppe/go-internal/testscript"
 )
 
-// prepareBinary is the path to the real prepare binary.
-// Set by TestMain before any tests run.
-var prepareBinary string //nolint:gochecknoglobals
+func buildPrepareBinary(ctx context.Context, t *testing.T) string {
+	t.Helper()
 
-func TestMain(m *testing.M) {
-	prepareBinary = buildPrepareBinary()
-	os.Exit(m.Run())
-}
-
-func buildPrepareBinary() string {
 	cacheDir, err := os.UserCacheDir()
 	if err != nil {
-		log.Fatalf("cache dir: %v", err)
+		t.Fatalf("cache dir: %v", err)
 	}
 	dir := filepath.Join(cacheDir, "xk6-docs-test")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		log.Fatalf("mkdir: %v", err)
+		t.Fatalf("mkdir: %v", err)
 	}
 
 	bin := filepath.Join(dir, "prepare")
-	build := exec.CommandContext(context.Background(), "go", "build", "-o", bin, ".")
+	build := exec.CommandContext(ctx, "go", "build", "-o", bin, ".")
 	build.Dir, _ = os.Getwd()
 	out, err := build.CombinedOutput()
 	if err != nil {
-		log.Fatalf("build prepare: %v\n%s", err, out)
+		t.Fatalf("build prepare: %v\n%s", err, out)
 	}
 	return bin
 }
@@ -43,17 +35,22 @@ func buildPrepareBinary() string {
 func TestScripts(t *testing.T) {
 	t.Parallel()
 
+	ctx := t.Context()
+	bin := buildPrepareBinary(ctx, t)
+
 	testscript.Run(t, testscript.Params{
 		Dir: "testdata/scripts",
 		Setup: func(env *testscript.Env) error {
-			if err := os.Symlink(prepareBinary, filepath.Join(env.WorkDir, "prepare")); err != nil {
+			if err := os.Symlink(bin, filepath.Join(env.WorkDir, "prepare")); err != nil {
 				return err
 			}
 			// Copy mock docs for tests that need them.
 			return copyDir("testdata/mockdocs", filepath.Join(env.WorkDir, "mockdocs"))
 		},
 		Cmds: map[string]func(ts *testscript.TestScript, neg bool, args []string){
-			"gitinit": runGitInit,
+			"gitinit": func(ts *testscript.TestScript, neg bool, args []string) {
+				runGitInit(ctx, ts, neg, args)
+			},
 		},
 		UpdateScripts: os.Getenv("UPDATE_GOLDEN") != "",
 	})
@@ -61,7 +58,7 @@ func TestScripts(t *testing.T) {
 
 // runGitInit creates a minimal local git repo for clone tests.
 // Usage: gitinit <dir>
-func runGitInit(ts *testscript.TestScript, _ bool, args []string) {
+func runGitInit(ctx context.Context, ts *testscript.TestScript, _ bool, args []string) {
 	if len(args) != 1 {
 		ts.Fatalf("usage: gitinit <dir>")
 	}
@@ -79,7 +76,7 @@ func runGitInit(ts *testscript.TestScript, _ bool, args []string) {
 		{"git", "add", "."},
 		{"git", "-c", "user.name=test", "-c", "user.email=test@test", "-c", "commit.gpgsign=false", "commit", "-m", "init"},
 	} {
-		cmd := exec.CommandContext(context.Background(), cmdArgs[0], cmdArgs[1:]...)
+		cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
 		cmd.Dir = dir
 		if out, err := cmd.CombinedOutput(); err != nil {
 			ts.Fatalf("%v: %v\n%s", cmdArgs, err, out)
