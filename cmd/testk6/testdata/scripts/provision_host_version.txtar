@@ -1,0 +1,18 @@
+# K6_PROVISION_HOST_VERSION is used when --version and K6_DOCS_VERSION are unset.
+# The raw version (v0.55.0) is wildcarded to v0.55.x for cache lookup.
+env HOME=$WORK/fakehome
+env USERPROFILE=
+env K6_DOCS_VERSION=
+env K6_DOCS_CACHE_DIR=
+env K6_PROVISION_HOST_VERSION=v0.55.0
+cpdir $WORK/cache $WORK/fakehome/.local/share/k6/docs/v0.55.x
+exec ./k6 x docs
+stdout 'v0.55.x'
+
+# K6_DOCS_VERSION takes priority over K6_PROVISION_HOST_VERSION.
+env HOME=$WORK/fakehome2
+env K6_DOCS_VERSION=v0.55.x
+env K6_PROVISION_HOST_VERSION=v9.99.0
+cpdir $WORK/cache $WORK/fakehome2/.local/share/k6/docs/v0.55.x
+exec ./k6 x docs
+stdout 'v0.55.x'

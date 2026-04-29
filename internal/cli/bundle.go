@@ -43,6 +43,9 @@ func setup(
 		version = env["K6_DOCS_VERSION"]
 	}
 	if version == "" {
+		version = env["K6_PROVISION_HOST_VERSION"]
+	}
+	if version == "" {
 		version, err = detectK6Version(debug.ReadBuildInfo)
 		if err != nil {
 			return nil, fmt.Errorf("detect k6 version: %w", err)
