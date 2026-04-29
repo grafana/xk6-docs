@@ -5,8 +5,8 @@ import (
 
 	"github.com/grafana/xk6-docs/internal/cli"
 	"github.com/spf13/cobra"
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/lib/fsext"
 )
 
 func newCmd(gs *state.GlobalState) *cobra.Command {
