@@ -24,7 +24,7 @@ import (
 	"github.com/rogpeppe/go-internal/testscript"
 )
 
-// buildTestBinary builds cmd/testk6 once and caches the result under the
+// buildTestBinary builds internal/clitest once and caches the result under the
 // Go build cache directory. Subsequent runs reuse the cached binary if
 // the source hasn't changed (checked via go build's own staleness logic).
 func buildTestBinary(ctx context.Context, t *testing.T) string {
@@ -43,7 +43,7 @@ func buildTestBinary(ctx context.Context, t *testing.T) string {
 	build := exec.CommandContext(ctx, "go", "build", "-o", bin, ".")
 	out, err := build.CombinedOutput()
 	if err != nil {
-		t.Fatalf("build testk6: %v\n%s", err, out)
+		t.Fatalf("build clitest: %v\n%s", err, out)
 	}
 	return bin
 }
