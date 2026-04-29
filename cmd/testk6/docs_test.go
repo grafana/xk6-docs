@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -136,25 +137,16 @@ func runPtyExec(ctx context.Context, ts *testscript.TestScript, neg bool, args [
 	}
 }
 
-// ptyEnv builds a clean environment for ptyexec subprocesses.
-// It pulls known vars from the testscript env and sets TERM for TTY detection.
-// Host NO_COLOR is excluded unless the script explicitly sets it.
+// ptyEnv returns the testscript environment plus TERM for TTY detection.
+// It reads the unexported env field via reflect because TestScript has no
+// method to enumerate all variables.
 func ptyEnv(ts *testscript.TestScript) []string {
-	env := []string{
-		"PATH=" + ts.Getenv("PATH"),
-		"HOME=" + ts.Getenv("HOME"),
-		"TMPDIR=" + ts.Getenv("TMPDIR"),
-		"TERM=xterm-256color",
+	v := reflect.ValueOf(ts).Elem().FieldByName("env")
+	env := make([]string, v.Len(), v.Len()+1)
+	for i := range v.Len() {
+		env[i] = v.Index(i).String()
 	}
-	for _, key := range []string{
-		"K6_DOCS_VERSION", "K6_DOCS_CACHE_DIR", "K6_DOCS_BUNDLE_URL",
-		"USERPROFILE", "PAGER", "NO_COLOR", "K6_NO_COLOR", "COLORFGBG",
-	} {
-		if v := ts.Getenv(key); v != "" {
-			env = append(env, key+"="+v)
-		}
-	}
-	return env
+	return append(env, "TERM=xterm-256color")
 }
 
 // runLinecountGt asserts that the first file has strictly more lines than the second.
