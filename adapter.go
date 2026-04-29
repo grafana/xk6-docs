@@ -1,4 +1,4 @@
-package docs
+package module
 
 import (
 	"io/fs"
