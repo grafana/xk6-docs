@@ -11,11 +11,11 @@ cd /path/to/xk6-docs
 
 # Original CLI mode (from main branch, before changes)
 git stash  # stash local changes if any
-go build -o /tmp/xk6-docs-test/k6o ./cmd/testk6
+go build -o /tmp/xk6-docs-test/k6o ./internal/clitest
 git stash pop
 
 # New file-reading mode (with changes)
-go build -o /tmp/xk6-docs-test/k6d ./cmd/testk6
+go build -o /tmp/xk6-docs-test/k6d ./internal/clitest
 ```
 
 Verify they behave differently:
