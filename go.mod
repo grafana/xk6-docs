@@ -26,8 +26,8 @@ require (
 	buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.36.11-20240617172848-e1dbca2775a7.1 // indirect
 	buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.11-20260331160422-eae785f0a21d.1 // indirect
 	dario.cat/mergo v1.0.2 // indirect
-	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
-	github.com/Masterminds/semver/v3 v3.4.0 // indirect
+	github.com/Azure/go-ntlmssp v0.1.1 // indirect
+	github.com/Masterminds/semver/v3 v3.5.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
 	github.com/PuerkitoBio/goquery v1.12.0 // indirect
@@ -53,7 +53,7 @@ require (
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
-	github.com/dlclark/regexp2 v1.11.5 // indirect
+	github.com/dlclark/regexp2 v1.12.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/evanw/esbuild v0.28.0 // indirect
 	github.com/fatih/color v1.19.0 // indirect
@@ -70,8 +70,8 @@ require (
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/grafana/k6-cloud-openapi-client-go v0.0.2 // indirect
-	github.com/grafana/k6provider v0.4.0 // indirect
-	github.com/grafana/sobek v0.0.0-20260331145705-2272ac4993ef // indirect
+	github.com/grafana/k6provider v0.5.0 // indirect
+	github.com/grafana/sobek v0.0.0-20260429085637-a66d4790012b // indirect
 	github.com/grafana/xk6-dashboard-assets v0.1.2 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
@@ -80,13 +80,11 @@ require (
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/jhump/protoreflect v1.18.0 // indirect
 	github.com/jhump/protoreflect/v2 v2.0.0-beta.1 // indirect
-	github.com/josharian/intern v1.0.0 // indirect
 	github.com/kevinburke/ssh_config v1.6.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.3.0 // indirect
-	github.com/mailru/easyjson v0.9.2 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
-	github.com/mattn/go-isatty v0.0.21 // indirect
+	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/mattn/go-runewidth v0.0.21 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd // indirect
@@ -115,13 +113,13 @@ require (
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/yuin/goldmark v1.8.2 // indirect
 	github.com/yuin/goldmark-emoji v1.0.6 // indirect
-	go.k6.io/k6/v2 v2.0.0-rc1
+	go.k6.io/k6/v2 v2.0.0
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.43.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.42.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.43.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.43.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.43.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.42.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.43.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.43.0 // indirect
 	go.opentelemetry.io/otel/metric v1.43.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.43.0 // indirect
