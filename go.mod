@@ -11,7 +11,7 @@ require (
 	github.com/grafana/xk6-docs/docs v0.1.0
 	github.com/klauspost/compress v1.18.6
 	github.com/muesli/termenv v0.16.0
-	github.com/rogpeppe/go-internal v1.14.1
+	github.com/rogpeppe/go-internal v1.15.0
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/term v0.43.0
 	gopkg.in/yaml.v3 v3.0.1
