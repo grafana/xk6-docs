@@ -8,12 +8,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	docs "github.com/grafana/xk6-docs/docs"
@@ -62,6 +64,37 @@ func Build(k6Version, k6DocsPath, outputDir string, afs docs.FS, _ io.Writer) er
 	}
 
 	return writeBestPractices(afs, outputDir)
+}
+
+// SourceStamp returns a digest of the markdown files under the version
+// directory of the k6-docs working tree at k6DocsPath. The digest changes when
+// any .md file is added, removed, or modified (by relative path, size, or
+// modification time), letting callers skip rebuilding an unchanged source.
+func SourceStamp(k6DocsPath, k6Version string) (string, error) {
+	versionRoot := filepath.Join(k6DocsPath, "docs", "sources", "k6", docs.VersionWildcard(k6Version))
+	h := fnv.New64a()
+	err := filepath.WalkDir(versionRoot, func(p string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() || !strings.HasSuffix(p, ".md") {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(versionRoot, p)
+		if err != nil {
+			return err
+		}
+		_, _ = fmt.Fprintf(h, "%s\x00%d\x00%d\n", filepath.ToSlash(rel), info.Size(), info.ModTime().UnixNano())
+		return nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("stamp source: %w", err)
+	}
+	return strconv.FormatUint(h.Sum64(), 16), nil
 }
 
 // buildSharedContentMap reads all .md files under the shared directory and

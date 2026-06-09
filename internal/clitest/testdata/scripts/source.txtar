@@ -29,6 +29,16 @@ stdout 'EDITEDMARKER describes the feature'
 ptyexec ./k6 x docs --source $WORK/src2 using-k6 other
 stdout 'OTHERMARKER from the second checkout'
 
+# Skip-if-unchanged: the first run builds (and says so on stderr); an unchanged
+# rerun is skipped (no build message); editing the source rebuilds again.
+exec ./k6 x docs --source $WORK/src3
+stderr 'Building k6 next docs'
+exec ./k6 x docs --source $WORK/src3
+! stderr 'Building k6 next docs'
+cp page-edited.md src3/docs/sources/k6/next/using-k6/page.md
+exec ./k6 x docs --source $WORK/src3
+stderr 'Building k6 next docs'
+
 -- src/docs/sources/k6/next/_index.md --
 ---
 title: k6
@@ -96,6 +106,33 @@ title: Other
 weight: 20
 ---
 OTHERMARKER from the second checkout.
+
+-- src3/docs/sources/k6/next/_index.md --
+---
+title: k6
+---
+Root.
+
+-- src3/docs/sources/k6/next/using-k6/_index.md --
+---
+title: Using k6
+weight: 10
+---
+Using k6 overview.
+
+-- src3/docs/sources/k6/next/using-k6/page.md --
+---
+title: Page
+weight: 20
+---
+Original page body.
+
+-- page-edited.md --
+---
+title: Page
+weight: 20
+---
+Edited page body, longer than before.
 
 -- edited.md --
 ---
