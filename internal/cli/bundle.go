@@ -69,7 +69,7 @@ func setup(
 	}
 
 	if sourceFlag != "" {
-		base, err = buildSourceBundle(base, sourceFlag, version)
+		base, err = buildSourceBundle(logf, base, sourceFlag, version)
 		if err != nil {
 			return nil, err
 		}
@@ -119,8 +119,9 @@ const sourceCacheDir = ".sources"
 // returns its directory as a local-only cache base. Builds live under
 // {cacheBase}/.sources/{hash-of-abs-source}/, so each source directory a user
 // points at gets its own isolated build and they never affect each other or
-// the downloaded version bundles.
-func buildSourceBundle(cacheBase, source, version string) (string, error) {
+// the downloaded version bundles. The build is skipped when the source's
+// markdown files are unchanged since the last build (see [bundle.SourceStamp]).
+func buildSourceBundle(logf func(string, ...any), cacheBase, source, version string) (string, error) {
 	abs, err := filepath.Abs(source)
 	if err != nil {
 		return "", fmt.Errorf("resolve source path: %w", err)
@@ -129,15 +130,40 @@ func buildSourceBundle(cacheBase, source, version string) (string, error) {
 	_, _ = h.Write([]byte(abs))
 	base := filepath.Join(cacheBase, sourceCacheDir, strconv.FormatUint(uint64(h.Sum32()), 16))
 	out := filepath.Join(base, version)
+	stampPath := filepath.Join(base, version+".stamp")
+
+	// A stamp error (e.g. missing version dir) falls through to Build, which
+	// surfaces the canonical "version root not found" error.
+	stamp, stampErr := bundle.SourceStamp(abs, version)
 
 	osfs := bundle.NewOSFS()
+	if stampErr == nil && sourceUpToDate(osfs, out, stampPath, stamp) {
+		return base, nil
+	}
+
+	logf("Building k6 %s docs from %s...", version, abs)
 	if err := osfs.RemoveAll(out); err != nil {
 		return "", fmt.Errorf("clear scratch dir: %w", err)
 	}
 	if err := bundle.Build(version, abs, out, osfs, io.Discard); err != nil {
 		return "", fmt.Errorf("build docs from source: %w", err)
 	}
+	if stampErr == nil {
+		if err := osfs.WriteFile(stampPath, []byte(stamp), 0o600); err != nil {
+			return "", fmt.Errorf("write source stamp: %w", err)
+		}
+	}
 	return base, nil
+}
+
+// sourceUpToDate reports whether a prior build for this source exists and its
+// recorded stamp still matches, so the rebuild can be skipped.
+func sourceUpToDate(osfs docs.FS, out, stampPath, stamp string) bool {
+	if _, err := osfs.Stat(filepath.Join(out, "sections.json")); err != nil {
+		return false
+	}
+	prev, err := osfs.ReadFile(stampPath)
+	return err == nil && string(prev) == stamp
 }
 
 // baseCacheDir returns the doc cache base directory from HOME/USERPROFILE.
