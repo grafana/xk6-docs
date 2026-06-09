@@ -62,3 +62,18 @@ make lint                                               # Run linter
 make build                                              # Build k6 with this extension
 make prepare K6_VERSION=v1.5.x K6_DOCS_PATH=~/k6-docs   # Prepare docs bundle locally
 ```
+
+### Preview local docs
+
+Writing k6 docs? Point `k6 x docs` at your local k6-docs checkout to preview
+edits with no download or bundle setup. It applies the same transform as the
+published docs and reflects your edits on every run:
+
+```bash
+k6 x docs --source ~/k6-docs using-k6 feature-flags
+k6 x docs --source ~/k6-docs search "feature flag"
+```
+
+With `--source`, `--version` defaults to `next` (the in-development docs).
+Pass `--version` to preview another directory under `docs/sources/k6/`
+(e.g. `--version v1.6.x`).
