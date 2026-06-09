@@ -142,3 +142,14 @@ Every user-observable behavior of the `k6 x docs` CLI.
 ## Extension registration (register.go)
 
 108. Extension registered as `k6 x docs`
+
+## Local source preview (`--source`)
+
+109. `--source <k6-docs-path>` builds docs from a local k6-docs checkout instead of downloading; reflects edits on the next run
+110. Source builds use the same transform as published bundles (shortcodes, admonitions, links)
+111. With `--source`, `--version` defaults to `next` (in-development docs); explicit `--version`/`K6_DOCS_VERSION` overrides
+112. Source bundle is built under the cache base (`.local/share/k6/docs/.sources/<hash>/`), isolated from downloaded bundles and version discovery, served local-only (no network)
+113. Each distinct source path builds into its own subdir; different checkouts don't collide
+114. Shell completion does not reflect `--source` (uses the normal version cache)
+115. Rebuild is skipped when the source's markdown files are unchanged since the last build (stamp of path/size/mtime)
+116. A rebuild prints `Building k6 <version> docs from <path>...` on stderr; a skipped (unchanged) run prints nothing

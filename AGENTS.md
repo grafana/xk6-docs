@@ -53,7 +53,15 @@
 - Cache dir override via `--cache-dir` flag or `K6_DOCS_CACHE_DIR` env var.
 - `go.mod` floor for `go.k6.io/k6` must stay at v1.5.0 so Go's MVS doesn't override the k6 version users build with via xk6. Extension code can only use k6 APIs from v1.5.0; use build tags if newer APIs are needed.
 
-### Bundle preparation (standalone `cmd/prepare/`)
+### Local source preview (`--source`)
+- `--source <k6-docs-path>` (in `cmd.go`/`bundle.go`) makes `k6 x docs` build docs from a local k6-docs working tree instead of downloading. For docs authors previewing in-progress edits.
+- `setup` runs the shared `internal/bundle` pipeline (same transform as published bundles) into a scratch dir under the doc cache base: `{cacheBase}/.sources/{hash-of-abs-source}/{version}`. The `.sources` subdir is hidden from version discovery (`versionDirRe` matches only `vX.Y.x`), so it never affects normal usage or downloaded bundles. Each source path a user points at hashes to its own subdir, so different checkouts don't collide. Served local-only.
+- Rebuild is skipped when unchanged: `bundle.SourceStamp` digests the source `.md` files (path, size, mtime) into `{version}.stamp`; `buildSourceBundle` rebuilds only when the stamp differs or the prior build is missing. So edits/additions/deletions are reflected, unchanged reruns are fast, and there is no cleanup-on-exit. A rebuild logs `Building k6 <version> docs from <path>...` via `logf` (stderr); a skip is silent — `source.txtar` asserts on this to test skip-vs-rebuild end-to-end.
+- With `--source`, `--version` defaults to `next` (in-development docs), not the detected k6 version — authors want the version they're editing. An explicit `--version` (or `K6_DOCS_VERSION`) overrides it to another dir under `docs/sources/k6/`. A missing version dir yields "version root not found".
+- Completions ignore `--source` (they read the normal cache) — rebuilding the tree per TAB keystroke would be too slow. A brand-new local page renders when typed but won't appear in completions.
+
+### Bundle preparation (`internal/bundle`, standalone `cmd/prepare/`)
+- The transform-and-index pipeline lives in `internal/bundle` (`Build`), shared by the standalone `cmd/prepare/` tool and the `--source` preview. `cmd/prepare/` adds only flag parsing and the optional k6-docs clone.
 - Clones k6-docs if not present, checks out matching tag.
 - Builds shared content map from `docs/sources/shared/`.
 - Walks markdown files, parses YAML frontmatter (deduplicates duplicate keys by keeping first occurrence), derives slugs. All top-level directories are included (only the shared content directory is skipped).
