@@ -1,0 +1,105 @@
+# Preview docs built from a local k6-docs working tree via --source.
+# No download, no cache setup: the page is transformed from $WORK/src and rendered.
+# NO_COLOR keeps glamour output plain so assertions match contiguous text.
+env NO_COLOR=1
+env HOME=$WORK/home
+
+# No --version with --source: defaults to "next" (the in-development docs).
+ptyexec ./k6 x docs --source $WORK/src using-k6 my-feature
+stdout 'UNIQUEMARKER describes the configurable feature'
+
+# Source builds live under the doc cache base, isolated in .sources/ so normal
+# version discovery (which matches only vX.Y.x dirs) never sees them.
+exists $WORK/home/.local/share/k6/docs/.sources
+
+# --version overrides the "next" default to target another version directory.
+ptyexec ./k6 x docs --source $WORK/src --version v1.0.x using-k6 old-page
+stdout 'OLDMARKER from the released docs'
+
+# Search runs against the local source index (matches across two categories).
+ptyexec ./k6 x docs --source $WORK/src search configurable
+stdout 'my-feature'
+
+# Editing a page is reflected on the next run (stamp changes, bundle rebuilt).
+cp edited.md src/docs/sources/k6/next/using-k6/my-feature.md
+ptyexec ./k6 x docs --source $WORK/src using-k6 my-feature
+stdout 'EDITEDMARKER describes the feature'
+
+# A second, different source directory gets its own isolated build.
+ptyexec ./k6 x docs --source $WORK/src2 using-k6 other
+stdout 'OTHERMARKER from the second checkout'
+
+-- src/docs/sources/k6/next/_index.md --
+---
+title: k6
+---
+Root.
+
+-- src/docs/sources/k6/next/using-k6/_index.md --
+---
+title: Using k6
+weight: 10
+---
+Using k6 overview.
+
+-- src/docs/sources/k6/next/using-k6/my-feature.md --
+---
+title: My Feature
+weight: 20
+---
+UNIQUEMARKER describes the configurable feature.
+
+-- src/docs/sources/k6/next/javascript-api/_index.md --
+---
+title: JavaScript API
+weight: 30
+---
+API overview.
+
+-- src/docs/sources/k6/next/javascript-api/k6-foo/_index.md --
+---
+title: Foo
+weight: 40
+---
+Foo also describes the configurable thing.
+
+-- src/docs/sources/k6/v1.0.x/using-k6/_index.md --
+---
+title: Using k6
+weight: 10
+---
+Released overview.
+
+-- src/docs/sources/k6/v1.0.x/using-k6/old-page.md --
+---
+title: Old Page
+weight: 20
+---
+OLDMARKER from the released docs.
+
+-- src2/docs/sources/k6/next/_index.md --
+---
+title: k6
+---
+Root.
+
+-- src2/docs/sources/k6/next/using-k6/_index.md --
+---
+title: Using k6
+weight: 10
+---
+Using k6 overview.
+
+-- src2/docs/sources/k6/next/using-k6/other.md --
+---
+title: Other
+weight: 20
+---
+OTHERMARKER from the second checkout.
+
+-- edited.md --
+---
+title: My Feature
+weight: 20
+---
+EDITEDMARKER describes the feature.

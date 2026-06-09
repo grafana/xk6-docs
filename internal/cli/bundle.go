@@ -4,13 +4,16 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"path/filepath"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/grafana/xk6-docs/docs"
+	"github.com/grafana/xk6-docs/internal/bundle"
 )
 
 // docsEnv bundles the context needed for reading and transforming docs.
@@ -36,11 +39,17 @@ func setup(
 	env map[string]string,
 	logf func(string, ...any),
 	fs FS,
-	versionFlag, cacheDirFlg string,
+	versionFlag, sourceFlag, cacheDirFlg string,
 ) (denv *docsEnv, err error) {
 	version := versionFlag
 	if version == "" {
 		version = env["K6_DOCS_VERSION"]
+	}
+	// --source targets in-development docs, which live under the "next"
+	// directory. Default to it instead of the built k6 version so authors get
+	// the version they're editing; an explicit --version still overrides.
+	if version == "" && sourceFlag != "" {
+		version = "next"
 	}
 	if version == "" {
 		version = env["K6_PROVISION_HOST_VERSION"]
@@ -57,6 +66,14 @@ func setup(
 	base := cmp.Or(explicitDir, baseCacheDir(env))
 	if base == "" {
 		return nil, fmt.Errorf("neither HOME nor USERPROFILE is set")
+	}
+
+	if sourceFlag != "" {
+		base, err = buildSourceBundle(base, sourceFlag, version)
+		if err != nil {
+			return nil, err
+		}
+		explicitDir = base
 	}
 
 	opts := catalogOpts(env, base, explicitDir != "")
@@ -91,6 +108,36 @@ func catalogOpts(env map[string]string, base string, localOnly bool) []docs.Opti
 		opts = append(opts, docs.WithBundleURL(u))
 	}
 	return opts
+}
+
+// sourceCacheDir is the subdirectory under the doc cache base that holds
+// source-preview builds. It is hidden from normal version discovery, which
+// only matches "vX.Y.x" directory names (see docs/catalog.go versionDirRe).
+const sourceCacheDir = ".sources"
+
+// buildSourceBundle transforms a local k6-docs checkout into a bundle and
+// returns its directory as a local-only cache base. Builds live under
+// {cacheBase}/.sources/{hash-of-abs-source}/, so each source directory a user
+// points at gets its own isolated build and they never affect each other or
+// the downloaded version bundles.
+func buildSourceBundle(cacheBase, source, version string) (string, error) {
+	abs, err := filepath.Abs(source)
+	if err != nil {
+		return "", fmt.Errorf("resolve source path: %w", err)
+	}
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(abs))
+	base := filepath.Join(cacheBase, sourceCacheDir, strconv.FormatUint(uint64(h.Sum32()), 16))
+	out := filepath.Join(base, version)
+
+	osfs := bundle.NewOSFS()
+	if err := osfs.RemoveAll(out); err != nil {
+		return "", fmt.Errorf("clear scratch dir: %w", err)
+	}
+	if err := bundle.Build(version, abs, out, osfs, io.Discard); err != nil {
+		return "", fmt.Errorf("build docs from source: %w", err)
+	}
+	return base, nil
 }
 
 // baseCacheDir returns the doc cache base directory from HOME/USERPROFILE.
