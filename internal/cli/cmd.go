@@ -15,6 +15,7 @@ import (
 // docsOpts holds CLI flags for the docs command.
 type docsOpts struct {
 	version  string
+	source   string
 	cacheDir string
 	depth    int
 	pager    bool
@@ -54,13 +55,18 @@ func buildDocsCmd(rt *Runtime, opts *docsOpts, agentHandled *bool) *cobra.Comman
 
 Auto-downloads docs matching your k6 version on first run, then serves
 from cache. Topics resolve from space-separated args (e.g. "http get").
-Use search to find topics quickly.`,
+Use search to find topics quickly.
+
+Use --source <k6-docs-path> to preview docs from a local k6-docs checkout
+instead of downloading. With --source, --version defaults to "next" (the
+in-development docs); pass --version to target another version directory
+under docs/sources/k6/.`,
 		Args: cobra.ArbitraryArgs,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			if rt.IsTTY || opts.pager {
 				return nil
 			}
-			env, err := setup(cmd.Context(), rt.Env, rt.Logf, rt.FS, opts.version, opts.cacheDir)
+			env, err := setup(cmd.Context(), rt.Env, rt.Logf, rt.FS, opts.version, opts.source, opts.cacheDir)
 			if err != nil {
 				return err
 			}
@@ -139,12 +145,14 @@ func buildCompletionTopics(rt *Runtime, opts *docsOpts) completionFunc {
 
 func registerFlags(cmd *cobra.Command, opts *docsOpts) {
 	cmd.PersistentFlags().StringVar(&opts.version, "version", "", "Override k6 version for docs lookup")
+	cmd.PersistentFlags().StringVar(&opts.source, "source", "", "Build docs from a local k6-docs checkout")
 	cmd.PersistentFlags().StringVar(&opts.cacheDir, "cache-dir", "", "Override cache directory")
 	cmd.PersistentFlags().IntVar(&opts.depth, "depth", 0, "Override subtopic depth (default 1)")
 	cmd.PersistentFlags().BoolVarP(&opts.pager, "pager", "p", false, "Display with pager")
 	cmd.PersistentFlags().IntVarP(&opts.width, "width", "w", 0, "Word-wrap width (0 for terminal width)")
 
 	_ = cmd.RegisterFlagCompletionFunc("version", cobra.NoFileCompletions)
+	_ = cmd.RegisterFlagCompletionFunc("source", completionDirs)
 	_ = cmd.RegisterFlagCompletionFunc("cache-dir", completionDirs)
 	_ = cmd.RegisterFlagCompletionFunc("depth", cobra.NoFileCompletions)
 }
@@ -153,7 +161,7 @@ func setHelpFunc(cmd *cobra.Command, rt *Runtime, opts *docsOpts) {
 	defaultHelp := cmd.HelpFunc()
 	cmd.SetHelpFunc(func(c *cobra.Command, args []string) {
 		if !rt.IsTTY {
-			if env, err := setup(c.Context(), rt.Env, rt.Logf, rt.FS, opts.version, opts.cacheDir); err == nil {
+			if env, err := setup(c.Context(), rt.Env, rt.Logf, rt.FS, opts.version, opts.source, opts.cacheDir); err == nil {
 				printAgentGuide(c.OutOrStdout(), env.cacheDir)
 				return
 			}
@@ -183,7 +191,7 @@ func newWithDocs(
 	rt *Runtime, opts *docsOpts,
 ) func(cmd *cobra.Command, fn func(*docsEnv, io.Writer) error) error {
 	return func(cmd *cobra.Command, fn func(*docsEnv, io.Writer) error) error {
-		env, err := setup(cmd.Context(), rt.Env, rt.Logf, rt.FS, opts.version, opts.cacheDir)
+		env, err := setup(cmd.Context(), rt.Env, rt.Logf, rt.FS, opts.version, opts.source, opts.cacheDir)
 		if err != nil {
 			return err
 		}
