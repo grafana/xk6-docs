@@ -9,10 +9,9 @@ import (
 	"strings"
 )
 
-// RenderEndpoint produces the markdown-rendered detail for one
-// endpoint. Port of render_endpoint() in gen_skill.py. The output must
-// be byte-identical to the corresponding skill endpoint file (and to
-// the Python mock's `show` output) so the C3 fairness guarantee holds.
+// RenderEndpoint produces the markdown-rendered detail for one endpoint:
+// header, auth, tags, parameters, request body, responses, and a curl
+// invocation example.
 func RenderEndpoint(spec *Spec, op *Operation) string {
 	lines := make([]string, 0, 64)
 	lines = append(lines, renderEndpointHeader(op)...)
@@ -208,9 +207,9 @@ func renderEndpointInvocation(spec *Spec, op *Operation) []string {
 
 // --- parameter rendering ----------------------------------------------------
 
-// formatParamLine mirrors _format_param_line in gen_skill.py. The
-// X-Stack-Id header gets a compact one-liner that points to SKILL.md
-// instead of repeating the multi-line description per endpoint.
+// formatParamLine renders one parameter as a bullet line. The X-Stack-Id
+// header gets a compact, fixed description instead of repeating its lengthy
+// spec description on every endpoint.
 func formatParamLine(p Parameter) string {
 	if p.Name == "X-Stack-Id" && p.In == "header" {
 		return "- `X-Stack-Id` `integer` required — Numeric ID of the Grafana stack."

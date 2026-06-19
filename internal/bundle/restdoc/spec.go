@@ -11,11 +11,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// OrderedMap is a YAML mapping that preserves key insertion order. The
-// Python reference loader relies on Python's dict preserving insertion
-// order; we replicate that here so output ordering (paths, methods,
-// response statuses, schema properties) is byte-identical to the Python
-// renderer.
+// OrderedMap is a YAML mapping that preserves key insertion order, so the
+// rendered output keeps paths, methods, response statuses, and schema
+// properties in their original spec order.
 type OrderedMap struct {
 	Keys   []string
 	Values map[string]any
