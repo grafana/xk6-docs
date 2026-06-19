@@ -28,13 +28,13 @@ Iteration-1 boundaries (descoped deliberately — see Decision Log): both v5 and
 
 ## Progress
 
-- [x] (2026-06-17) Design completed; iteration-1 scope descoped and locked; this plan authored. Implementation not yet started.
-- [ ] M1: Port `spec.go` + `render.go` into `internal/bundle/restdoc` (NOT `scope.go`); reword the two "SKILL.md" lines; drop cobra/runtime-coupled code; port unit tests.
-- [ ] M2: Embed v5 (static) + v6 (fallback) specs; add `restdoc.Generate(afs, markdownDir, v6Spec)` producing `[]docs.Section` + markdown (3 index pages + v5/v6 leaves); unit test on fixture specs.
-- [ ] M3: Add a `WithExtraSections` injection option to `internal/bundle.Build` (bundle does NOT import restdoc); `--source` passes no option so it omits REST; unit test the hook with a trivial generator.
-- [ ] M4: Wire `cmd/prepare` to fetch v6 fresh at build time (embedded fallback) and inject `restdoc.Generate` via `WithExtraSections`; prepare test asserts `cloud-rest-api/v6/<op>` and the embedded-fallback path.
-- [ ] M5: End-to-end serving via a new `internal/clitest/testdata/scripts/cloud_rest_api.txtar`: TOC, leaf render, search, completion.
-- [ ] M6: Docs and cleanup — update `AGENTS.md`, `.agents/features.md`, the agent skill; confirm no `k6 x rest` is registered and `go mod tidy` adds no new dependency.
+- [x] (2026-06-17) Design completed; iteration-1 scope descoped and locked; this plan authored.
+- [x] (2026-06-19) M1: Ported `spec.go` + `render.go` into `internal/bundle/restdoc` (not `scope.go`); reworded the two "SKILL.md" lines; dropped cobra/runtime-coupled code; ported unit tests + added `render_test.go`. (commit bda4509)
+- [x] (2026-06-19) M2: Embedded v5 (static) + v6 (fallback) specs; added `restdoc.Generate(afs, markdownDir, v6Spec)` producing `[]docs.Section` + markdown (3 index pages + v5/v6 leaves); `generate_test.go` + ported `spec_v5_test.go`. (commit 44f8767)
+- [x] (2026-06-19) M3: Added `WithExtraSections` option to `internal/bundle.Build` (bundle does NOT import restdoc); `bundle_test.go` covers the hook. (commit 7d741ed)
+- [x] (2026-06-19) M4: Wired `cmd/prepare` to fetch v6 at build time with embedded fallback and inject `restdoc.Generate`; `--v6-spec-url` flag is the test seam; `run_test.go` asserts the fallback path produces `cloud-rest-api/v6`. (commit f7229a5)
+- [x] (2026-06-19) M5: Added `internal/clitest/testdata/scripts/cloud_rest_api.txtar` (TOC, leaf render, search, completion) with a self-contained fixture bundle. (commit 38fd143)
+- [x] (2026-06-19) M6: Updated `AGENTS.md`, `.agents/features.md`, agent guide, and skill description; confirmed no `k6 x rest` registration and `go mod tidy` adds no new dependency. (commit e39c071)
 
 
 ## Surprises & Discoveries
@@ -53,6 +53,9 @@ Iteration-1 boundaries (descoped deliberately — see Decision Log): both v5 and
 
 - Observation: The Bundle Sync staleness check is coupled to k6-docs git activity, not to the OpenAPI spec.
   Evidence: `.github/scripts/sync.sh` (lines 36-49) rebuilds a version's bundle only when it is missing or when the last commit date of `docs/sources/k6/<version>` in the k6-docs repo is newer than the bundle asset's upload date. It never inspects the live v6 OpenAPI document. CONSEQUENCE: a build-time-fetched v6 spec only refreshes when the bundle is rebuilt for k6-docs reasons (or via manual `workflow_dispatch`); if the API changes while a version's k6-docs folder is quiet, that version's baked v6 snapshot stays stale until the next rebuild trigger.
+
+- Observation: The pre-existing `cmd/prepare` `TestScripts/auto_clone` testscript fails locally on a machine with a global git commit-msg policy hook, unrelated to this change.
+  Evidence: that machine sets `init.templateDir = ~/.git-templates`, which installs a commit-msg policy hook into every `git init` repo — including the one the testscript creates. The testscript's `git commit -m init` is rejected ("Title must start with one of these verbs"), so the test errors with "fatal: ambiguous argument 'HEAD'". This reproduces at the pre-change commit, so it is environmental, not a regression; CI (no such template) passes. All other packages (`restdoc`, `bundle`, `cli`, `clitest`, and the new `cmd/prepare` `TestRun_RESTSectionEmbeddedFallback`) pass locally.
 
 
 ## Decision Log
@@ -108,7 +111,9 @@ Iteration-1 boundaries (descoped deliberately — see Decision Log): both v5 and
 
 ## Outcomes & Retrospective
 
-To be completed at milestone boundaries and at the end. Compare the result against the Purpose: can a user run `k6 x docs cloud-rest-api/v6/<operationId>` and read a correctly rendered endpoint, find it via `k6 x docs search`, and complete it via the shell, with no `k6 x rest` command and no new dependency?
+(2026-06-19, iteration 1 complete.) All six milestones landed across six bisectable commits (bda4509, 44f8767, 7d741ed, f7229a5, 38fd143, e39c071) on branch `feat/merge-rest-into-docs`. Against the Purpose: a bundle built by `cmd/prepare` now contains `markdown/cloud-rest-api/**` plus `cloud-rest-api` entries in `sections.json`; the end-to-end testscript proves `k6 x docs cloud-rest-api` lists v5/v6, `k6 x docs cloud-rest-api/v6/<op>` renders an endpoint, `k6 x docs search` finds it, and completion offers it. There is no `k6 x rest` command, the v6 spec is fetched at build time with the embedded copy as fallback, the v5 spec is a static embed, and `go mod tidy` confirms zero new dependencies. The `restdoc` generator is imported only by `cmd/prepare`, so its embedded specs stay out of the extension binary.
+
+Remaining / out of scope for this iteration (recorded for follow-up): the k6-extension-registry change so provisioning advertises this module's REST content and the retirement of the xk6-rest repo (external coordination, user-owned); making `sync.sh` OpenAPI-aware for tighter v6 freshness; and `--source` previews of the REST section. None block the feature.
 
 
 ## Context and Orientation
