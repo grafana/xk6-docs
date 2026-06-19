@@ -1,0 +1,101 @@
+# The generated cloud-rest-api section is served by the normal docs
+# machinery: table of contents, endpoint rendering, search, and completion.
+# A self-contained fixture bundle under $WORK/restcache keeps this test
+# independent of the shared cache fixture.
+
+env NO_COLOR=1
+
+# Section TOC lists the v5 and v6 subtopics.
+ptyexec ./k6 x docs --cache-dir $WORK/restcache --version v0.55.x cloud-rest-api
+stdout 'Grafana Cloud k6 REST API'
+stdout '- v5'
+stdout '- v6'
+
+# An endpoint page renders its full markdown.
+ptyexec ./k6 x docs --cache-dir $WORK/restcache --version v0.55.x cloud-rest-api/v6/load_tests_list
+stdout 'load_tests_list'
+stdout 'Invocation'
+
+# Unified search finds the endpoint.
+ptyexec ./k6 x docs --cache-dir $WORK/restcache --version v0.55.x search load
+stdout 'load_tests_list'
+
+# Completion offers the top-level section and its version children.
+env K6_DOCS_CACHE_DIR=$WORK/restcache
+env K6_DOCS_VERSION=v0.55.x
+exec ./k6 __complete x docs ''
+stdout 'cloud-rest-api'
+stdout ':4'
+
+exec ./k6 __complete x docs cloud-rest-api ''
+stdout 'v5'
+stdout 'v6'
+
+-- restcache/v0.55.x/sections.json --
+{
+  "version": "v0.55.x",
+  "sections": [
+    {
+      "slug": "cloud-rest-api",
+      "rel_path": "cloud-rest-api/_index.md",
+      "title": "Grafana Cloud k6 REST API",
+      "description": "Reference for the Grafana Cloud k6 REST API.",
+      "weight": 0,
+      "category": "cloud-rest-api",
+      "children": ["cloud-rest-api/v5", "cloud-rest-api/v6"],
+      "is_index": true
+    },
+    {
+      "slug": "cloud-rest-api/v5",
+      "rel_path": "cloud-rest-api/v5/_index.md",
+      "title": "v5 — Metrics API",
+      "description": "Grafana Cloud k6 v5 REST API endpoints.",
+      "weight": 0,
+      "category": "cloud-rest-api",
+      "children": [],
+      "is_index": true
+    },
+    {
+      "slug": "cloud-rest-api/v6",
+      "rel_path": "cloud-rest-api/v6/_index.md",
+      "title": "v6 — General-purpose API",
+      "description": "Grafana Cloud k6 v6 REST API endpoints.",
+      "weight": 1,
+      "category": "cloud-rest-api",
+      "children": ["cloud-rest-api/v6/load_tests_list"],
+      "is_index": true
+    },
+    {
+      "slug": "cloud-rest-api/v6/load_tests_list",
+      "rel_path": "cloud-rest-api/v6/load_tests_list.md",
+      "title": "load_tests_list",
+      "description": "List load tests.",
+      "weight": 0,
+      "category": "cloud-rest-api",
+      "children": null,
+      "is_index": false
+    }
+  ]
+}
+-- restcache/v0.55.x/markdown/cloud-rest-api/_index.md --
+# Grafana Cloud k6 REST API
+
+Reference for the Grafana Cloud k6 REST API.
+-- restcache/v0.55.x/markdown/cloud-rest-api/v5/_index.md --
+# v5 — Metrics API
+
+Grafana Cloud k6 v5 REST API endpoints.
+-- restcache/v0.55.x/markdown/cloud-rest-api/v6/_index.md --
+# v6 — General-purpose API
+
+Grafana Cloud k6 v6 REST API endpoints.
+-- restcache/v0.55.x/markdown/cloud-rest-api/v6/load_tests_list.md --
+# `load_tests_list`
+
+`GET /cloud/v6/load_tests`
+
+List load tests.
+
+## Invocation
+
+Base URL: `https://api.k6.io`.
