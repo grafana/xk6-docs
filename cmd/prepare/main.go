@@ -59,16 +59,11 @@ func run(
 		defer cleanup()
 	}
 
-	// Fetch the latest v6 OpenAPI spec at build time. Fall back to the spec
-	// embedded in restdoc when the network is unavailable so a build never
-	// fails on a transient outage.
-	v6Spec, err := fetchV6Spec(httpClient)
-	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "warning: fetch v6 spec: %v; using embedded copy\n", err)
-		v6Spec = nil
-	}
+	// Fetch the latest v6 OpenAPI spec at build time, validating it before use.
+	// Fall back to the spec embedded in restdoc on any problem so a build never
+	// fails or ships an empty section because of a transient or bad response.
 	restSections := func(fsys docs.FS, markdownDir string) ([]docs.Section, error) {
-		return restdoc.Generate(fsys, markdownDir, v6Spec)
+		return restdoc.Generate(fsys, markdownDir, fetchV6Override(httpClient, stderr))
 	}
 
 	if err := bundle.Build(k6Version, docsPath, outputDir, afs, stderr,
@@ -112,6 +107,30 @@ func fetchV6Spec(client *http.Client) ([]byte, error) {
 		return nil, fmt.Errorf("unexpected status %s", resp.Status)
 	}
 	return io.ReadAll(resp.Body)
+}
+
+// fetchV6Override returns a freshly fetched v6 OpenAPI spec for
+// restdoc.Generate, or nil to use the embedded copy. It fetches, then requires
+// the bytes to parse and contain at least one operation; any failure
+// (transport, non-200, parse error, or empty spec) logs a warning and returns
+// nil so the build falls back to the embedded spec rather than failing or
+// shipping an empty section.
+func fetchV6Override(client *http.Client, stderr io.Writer) []byte {
+	body, err := fetchV6Spec(client)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "warning: fetch v6 spec: %v; using embedded copy\n", err)
+		return nil
+	}
+	spec, err := restdoc.LoadSpecFromBytes(body)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "warning: fetched v6 spec did not parse: %v; using embedded copy\n", err)
+		return nil
+	}
+	if len(spec.Operations) == 0 {
+		_, _ = fmt.Fprintln(stderr, "warning: fetched v6 spec had no operations; using embedded copy")
+		return nil
+	}
+	return body
 }
 
 // ensureDocsRepo returns the path to the k6-docs repo. If k6DocsPath is empty,
