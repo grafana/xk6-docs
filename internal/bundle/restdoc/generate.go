@@ -3,6 +3,7 @@ package restdoc
 import (
 	_ "embed"
 	"fmt"
+	"log"
 	"path"
 	"path/filepath"
 	"strings"
@@ -85,6 +86,10 @@ func generateVersion(afs docs.FS, markdownDir string, v apiVersion, weight int) 
 	for i := range spec.Operations {
 		op := &spec.Operations[i]
 		bareID := strings.TrimPrefix(op.OperationID, v.name+"/")
+		if !safeOperationID(bareID) {
+			log.Printf("warning: skipping %s operation with unsafe operationId %q", v.name, op.OperationID)
+			continue
+		}
 		slug := path.Join(verSlug, bareID)
 		relPath := slug + ".md"
 		if err := writePage(afs, markdownDir, relPath, RenderEndpoint(spec, op)); err != nil {
@@ -117,8 +122,25 @@ func indexBody(title, intro string) string {
 	return fmt.Sprintf("# %s\n\n%s\n", title, intro)
 }
 
+// safeOperationID reports whether id is a single, non-escaping path segment.
+// An empty id, a path separator, or a "."/".." segment could place the
+// generated page outside the section directory (path traversal) or collide
+// with an index page, so such operations are skipped. operationIds in the wild
+// are simple identifiers (e.g. "load_tests_list"); this rejects only malformed
+// or hostile input, which matters now that the v6 spec is fetched at build
+// time rather than embedded.
+func safeOperationID(id string) bool {
+	return id != "" && id != "." && id != ".." && !strings.ContainsAny(id, `/\`)
+}
+
 func writePage(afs docs.FS, markdownDir, relPath, body string) error {
 	outPath := filepath.Join(markdownDir, filepath.FromSlash(relPath))
+	// Defense in depth: never write outside the markdown directory, whatever
+	// relPath contains.
+	if rel, err := filepath.Rel(markdownDir, outPath); err != nil ||
+		rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("refusing to write outside markdown dir: %s", relPath)
+	}
 	if err := afs.MkdirAll(filepath.Dir(outPath), 0o750); err != nil {
 		return fmt.Errorf("mkdir %s: %w", filepath.Dir(outPath), err)
 	}

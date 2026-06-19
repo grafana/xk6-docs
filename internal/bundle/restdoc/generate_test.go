@@ -114,3 +114,70 @@ func TestGenerate_V6Override(t *testing.T) {
 		t.Error("v6 override not applied: expected slug cloud-rest-api/v6/things_get")
 	}
 }
+
+// TestGenerate_RejectsUnsafeOperationID ensures operationIds that would escape
+// the output directory (path traversal) or are empty are skipped rather than
+// written, while well-formed operations still generate.
+func TestGenerate_RejectsUnsafeOperationID(t *testing.T) {
+	t.Parallel()
+
+	const spec = `
+openapi: 3.0.0
+info:
+  title: Unsafe
+  version: 1.0.0
+servers:
+  - url: https://api.k6.io
+paths:
+  /good:
+    get:
+      operationId: good_op
+      responses:
+        "200":
+          description: OK
+  /evil:
+    get:
+      operationId: ../../../../etc/evil
+      responses:
+        "200":
+          description: OK
+  /empty:
+    get:
+      responses:
+        "200":
+          description: OK
+`
+
+	mfs := newMemFS()
+	sections, err := Generate(mfs, "out/markdown", []byte(spec))
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	good := false
+	for _, s := range sections {
+		if s.Slug == "cloud-rest-api/v6/good_op" {
+			good = true
+		}
+		if strings.Contains(s.Slug, "evil") {
+			t.Errorf("unsafe operationId produced a section: %q", s.Slug)
+		}
+	}
+	if !good {
+		t.Error("expected cloud-rest-api/v6/good_op section to be generated")
+	}
+
+	// No file is written outside the markdown directory.
+	base := filepath.Clean("out/markdown")
+	for key := range mfs.files {
+		rel, err := filepath.Rel(base, key)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			t.Errorf("file written outside markdown dir: %q", key)
+		}
+	}
+
+	// The empty operationId must not collide with the v6 index page.
+	if _, ok := mfs.files[filepath.Join("out/markdown", "cloud-rest-api", "v6.md")]; ok {
+		t.Error("empty operationId wrote cloud-rest-api/v6.md (collides with v6 index)")
+	}
+}
