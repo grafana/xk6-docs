@@ -202,12 +202,14 @@ func (s *Spec) PrefixOperationIDs(prefix string) {
 	}
 }
 
-// httpVerbs is the set of OpenAPI path-item method keys we recognise.
-//
-//nolint:gochecknoglobals // immutable lookup set; treated as a constant
-var httpVerbs = map[string]bool{
-	"get": true, "put": true, "post": true, "delete": true,
-	"options": true, "head": true, "patch": true, "trace": true,
+// isHTTPVerb reports whether m is an OpenAPI path-item HTTP method key.
+func isHTTPVerb(m string) bool {
+	switch m {
+	case "get", "put", "post", "delete", "options", "head", "patch", "trace":
+		return true
+	default:
+		return false
+	}
 }
 
 // LoadSpecFromBytes parses OpenAPI YAML bytes and returns the
@@ -259,7 +261,7 @@ func LoadSpecFromBytes(specBytes []byte) (*Spec, error) {
 			// Path-level parameters are shared across every operation under the path.
 			pathLevelParams := methods.GetSlice("parameters")
 			for _, m := range methods.Keys {
-				if !httpVerbs[m] {
+				if !isHTTPVerb(m) {
 					continue
 				}
 				raw := methods.GetMap(m)
