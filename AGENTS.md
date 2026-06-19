@@ -59,6 +59,7 @@
 - Rebuild is skipped when unchanged: `bundle.SourceStamp` digests the source `.md` files (path, size, mtime) into `{version}.stamp`; `buildSourceBundle` rebuilds only when the stamp differs or the prior build is missing. So edits/additions/deletions are reflected, unchanged reruns are fast, and there is no cleanup-on-exit. A rebuild logs `Building k6 <version> docs from <path>...` via `logf` (stderr); a skip is silent — `source.txtar` asserts on this to test skip-vs-rebuild end-to-end.
 - With `--source`, `--version` defaults to `next` (in-development docs), not the detected k6 version — authors want the version they're editing. An explicit `--version` (or `K6_DOCS_VERSION`) overrides it to another dir under `docs/sources/k6/`. A missing version dir yields "version root not found".
 - Completions ignore `--source` (they read the normal cache) — rebuilding the tree per TAB keystroke would be too slow. A brand-new local page renders when typed but won't appear in completions.
+- The generated `cloud-rest-api` section (below) is not produced under `--source`; only `cmd/prepare` injects it.
 
 ### Bundle preparation (`internal/bundle`, standalone `cmd/prepare/`)
 - The transform-and-index pipeline lives in `internal/bundle` (`Build`), shared by the standalone `cmd/prepare/` tool and the `--source` preview. `cmd/prepare/` adds only flag parsing and the optional k6-docs clone.
@@ -68,6 +69,13 @@
 - Handles slug collisions: prefers `_index.md` over leaf `.md` (it has children).
 - Populates parent→child relationships.
 - Outputs: `dist/sections.json`, `dist/markdown/**/*.md` (including `best_practices.md`).
+- `Build` accepts `WithExtraSections`, a hook run after the walk and before parent/child wiring; `cmd/prepare` uses it to inject the Cloud REST API section. `internal/bundle` does not import the generator.
+
+### Cloud REST API reference (`cloud-rest-api/`, `internal/bundle/restdoc/`)
+- `internal/bundle/restdoc` parses the Grafana Cloud k6 OpenAPI specs and renders one markdown page per endpoint under `cloud-rest-api/<v5|v6>/<operationId>`, plus `_index.md` pages, returning `docs.Section`s. Ported from xk6-rest (parser + renderer only — no runtime fetch/cache, no `k6 x rest` command).
+- `cmd/prepare` fetches the live v6 spec from `api.k6.io` at build time (10s timeout, injectable `*http.Client`) and passes it in; on any error it falls back to the v6 spec embedded in `restdoc`. The v5 spec is always the embedded, hand-authored reference (the v5 API publishes no OpenAPI doc and is deprecated).
+- Wired only through `cmd/prepare` via `WithExtraSections`, so `restdoc`'s embedded specs never enter the extension binary, and `--source` previews omit the section.
+- Served by the normal docs machinery (TOC, `search`, completion, rendering). Freshness is opportunistic: the baked v6 snapshot refreshes when a bundle is rebuilt (driven by k6-docs commits in `sync.sh`) or via a manual sync `workflow_dispatch`; `sync.sh` does not inspect the OpenAPI spec.
 
 ### Agent skill (`skills/xk6-docs/`)
 - Installable via `k6 x docs skill <dir>` (embeds SKILL.md + references via `//go:embed`, templates `<binary>` placeholder with the running binary's absolute path via `os.Args[0]`).

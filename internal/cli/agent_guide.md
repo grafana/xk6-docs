@@ -7,7 +7,7 @@ Browse and read them directly. Combine commands with `&&` and `|` to minimize ca
 ## Structure
 
 - `_index.md` in each directory has the overview and lists children.
-- Directories map to topic areas: `using-k6/`, `javascript-api/`, `using-k6-browser/`, `examples/`.
+- Directories map to topic areas: `using-k6/`, `javascript-api/`, `using-k6-browser/`, `examples/`, `cloud-rest-api/` (Grafana Cloud k6 REST API endpoints).
 - API modules are under `javascript-api/` with a `k6-` prefix (e.g. `k6-browser/`, `k6-net-grpc/`).
 
 ## Recipes
