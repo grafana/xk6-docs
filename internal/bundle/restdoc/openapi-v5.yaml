@@ -1,0 +1,1821 @@
+# Grafana Cloud k6 v5 Metrics REST API.
+#
+# Source of truth (prose):
+#   https://grafana.com/docs/grafana-cloud/testing/k6/reference/cloud-rest-api/metrics/
+# Last reviewed: 2026-05-18
+#
+# The v5 API does not publish an OpenAPI document. This file is
+# hand-authored to mirror the prose documentation above so that the
+# `k6 x rest` discovery commands can surface v5 metrics endpoints
+# alongside the v6 ones.
+#
+# Wire-format note. The `query_range_k6`, `query_aggregate_k6`, and
+# (multi-run) `metrics` endpoints take their arguments in OData-style
+# function-call syntax in the URL path itself, e.g.
+#
+#     /cloud/v5/test_runs/152779/query_range_k6(metric='http_reqs',query='rate',step=5)
+#
+# OpenAPI 3 cannot express arbitrary function-call parameters natively,
+# so this spec represents concrete multi-run metrics forms explicitly
+# (`metrics(test_run_count={testRunCount})`) and represents flexible
+# query expressions with a `{parameters}` path placeholder. The wire
+# format note appears in each affected operation's description.
+#
+# To partially compensate for the lost type info on `{parameters}`
+# placeholders, every function-call operation in this spec carries an
+# `x-odata-function-call` extension under its `get` block. The extension
+# captures the function's name and its parameter list (name, OData type,
+# required flag, optional description) so downstream code-generators and
+# documentation tools can build typed call-site helpers without having
+# to parse free-text descriptions. The extension's shape:
+#
+#     x-odata-function-call:
+#       name: <function-name>             # e.g. query_range_k6
+#       parameters:
+#       - name: <arg-name>                # e.g. query
+#         type: <Edm.*>                   # e.g. Edm.String, Edm.Int64,
+#                                         #      Edm.DateTimeOffset,
+#                                         #      Collection(Edm.Int64)
+#         required: true | false
+#         description: <free-text>        # optional
+#       constraints:                      # optional, free-form list
+#       - <free text constraint>
+#
+# `Edm.String` values are emitted single-quoted on the wire;
+# `Edm.DateTimeOffset` values are bare and require a timezone
+# designator; collection-typed values use literal square brackets
+# (`test_run_ids=[1,2,3]`). The extension is an aid; the operation
+# description remains the authoritative source for behavioural quirks.
+#
+# Curl caveat. The literal `[` and `]` in `(test_run_ids=[...])`
+# paths trigger curl's URL-globbing and produce `curl: (3) bad range
+# in URL position`. Either run curl with `-g` (`--globoff`) to
+# disable globbing, or rely on percent-encoding: the v5 API accepts
+# both the literal forms (`(`, `)`, `[`, `]`) and their
+# percent-encoded equivalents (`%28`, `%29`, `%5B`, `%5D`). Most HTTP
+# libraries (Python `requests`, JS `fetch`, etc.) percent-encode
+# `[]` automatically.
+#
+# Authentication is documented as the same `k6ApiToken` bearer scheme
+# used by the v6 spec (Personal API token or Grafana Stack API token).
+# This file omits `X-Stack-Id` because the v5 metrics docs do not
+# document it; callers going through the Grafana plugin-proxy have the
+# stack scoping handled for them by the proxy, and direct calls to
+# `api.k6.io/cloud/v5/...` accept the bearer token alone.
+#
+# Error handling.
+#   * 400 -- request validation failed *after* the URL parsed cleanly
+#            in the OData layer. Body is one of `ErrorResponse`
+#            (simple `{error: {code, message}}`) or
+#            `ValidationErrorResponse` (`{error: {code:
+#            "validation_error", details: [...], message, target}}`).
+#            Triggered by:
+#              - an unparseable Prometheus selector on `/series`,
+#                `/labels`, or `/label/{name}/values` -- yields the
+#                simple envelope,
+#              - a query expression incompatible with the metric type
+#                (e.g. `rate` on a trend metric) -- simple envelope,
+#              - an OData literal that parses as one type but cannot
+#                be coerced to the parameter's declared type (e.g.
+#                `test_run_count=1.5` -- `Decimal('1.5')` for an
+#                `Edm.Int64` parameter; or `start='2025-01-01T00:00Z'`
+#                -- string for `Edm.DateTimeOffset`) -- yields the
+#                validation-error envelope, with one entry in
+#                `details[]` per offending parameter.
+#   * 401 -- missing, malformed, or revoked token. Body is
+#            `ErrorResponse`. Two observed `message` values:
+#            `"Authentication required"` when no `Authorization`
+#            header is sent, and `"Invalid token"` when the header
+#            is present but the token is unrecognised.
+#   * 403 -- two distinct cases, both with `ErrorResponse` bodies.
+#            Distinguish them by `error.message`:
+#              - `"Authentication error - could not find or access
+#                requested resource."` -- the caller lacks access or
+#                the resource does not exist. The v5 API deliberately
+#                conflates these two so it does not leak test-run /
+#                load-test existence; 404 is NOT used for missing
+#                resources.
+#              - `"Validation failed"` -- a server-side validator
+#                rejected an argument (currently observed for
+#                negative `test_run_count` values on the multi-run
+#                operations). This case is best thought of as a
+#                "should-have-been-400 but the framework picked 403"
+#                quirk; callers wanting to distinguish "no access"
+#                from "bad input" must match on the message text.
+#   * 404 -- the URL did not match any OData route. Body is
+#            `ErrorResponse` whose `message` is the OData parser's
+#            `ParseException` text. Triggered by:
+#              - a function-call signature with a missing required
+#                key, an unrecognised extra key, or a literal that
+#                cannot be parsed as any OData type
+#                (e.g. `step=not-a-number`, naive `start`/`end`,
+#                or both `test_run_count` and `test_run_ids` together),
+#              - structural URL faults that don't even reach the
+#                function-call layer: a trailing slash on an
+#                otherwise-valid path, a non-numeric value where a
+#                numeric ID was expected (`/test_runs/abc/metrics`),
+#                or an empty bracket list (`test_run_ids=[]`).
+#              - an unrecognised query-string parameter on routes
+#                that the OData parser treats as function-call
+#                endpoints (e.g. `/cloud/v5/test_runs/{id}/labels?foo=bar`,
+#                `/cloud/v5/test_runs/{id}/series?foo=bar` with NO
+#                valid `match[]`, `/cloud/v5/load_tests/{id}/metrics?foo=bar`).
+#                NOT all v5 routes behave this way: routes the OData
+#                parser treats as plain entity-set GETs silently
+#                ignore unknown query-string parameters and return
+#                HTTP 200 (`/cloud/v5/test_runs/{id}/metrics?foo=bar`),
+#                as does `/series` once a valid `match[]` accompanies
+#                the unknown parameter. There is no public API for
+#                determining which route shape a path uses; consumers
+#                that need this distinction should treat the unknown-
+#                parameter status as endpoint-specific.
+#            Distinct from "resource not found" (which is 403 -- see
+#            above).
+#   * 405 -- non-GET method (POST, PUT, PATCH, DELETE) on any v5
+#            metrics path. Body is `ErrorResponse`.
+#   * 500 -- server error. Known cases at the time of writing:
+#              - `GET /cloud/v5/test_runs/{id}/labels?match[]=...`
+#                returns 500 regardless of selector (single or
+#                multiple match[] values). Workaround: omit `match[]`
+#                on `/labels` and post-filter client-side, or use
+#                `/series` with the same selector.
+#              - `query_range_k6(...,step=0)` and negative `step`
+#                values return 500 instead of 400.
+#            Body is `ErrorResponse` with `message: "Unknown error"`.
+openapi: 3.0.0
+info:
+  title: Grafana Cloud k6 v5 Metrics REST API
+  version: '5'
+  description: |-
+    Metrics endpoints for Grafana Cloud k6 test runs. These are the v5
+    counterparts to the v6 endpoints documented at
+    https://api.k6.io/cloud/v6/openapi, and live under `/cloud/v5/`.
+
+    Version reminder. Every path in this spec is prefixed with
+    `/cloud/v5/`; callers must pin to the `v5` major and not mix v5
+    paths into v6 base URLs (or vice versa) or the requests will 404.
+
+    Accept header. The official documentation shows
+    `Accept: application/json` on every example request. The live API
+    returns JSON regardless of the header, but callers that round-trip
+    through caches or content-negotiating proxies should send it
+    anyway to lock the response media type.
+servers:
+- url: https://api.k6.io
+  description: Grafana Cloud k6 REST API root.
+paths:
+
+  /cloud/v5/test_runs/{testRunId}/metrics:
+    get:
+      operationId: test_run_metrics_list
+      summary: List metrics emitted by a single test run.
+      description: |-
+        Returns every metric emitted by a single test run, including
+        built-in k6 metrics (e.g. `http_req_duration`, `vus`,
+        `data_sent`) and any user-defined metrics.
+      tags:
+      - metrics
+      security:
+      - k6ApiToken: []
+      parameters:
+      - in: path
+        name: testRunId
+        required: true
+        schema:
+          type: integer
+          format: int64
+        description: ID of the test run.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestRunMetricListResponse'
+              examples:
+                OK:
+                  value:
+                    value:
+                    - id: 1af77c11-5b93-58ba-b7a2-c839b0402cf7
+                      name: load_generator_file_handles
+                      origin: builtin
+                      test_run_id: 152779
+                      type: gauge
+                    - id: 38ae6276-4630-5ad6-a3bb-d11f678d96dd
+                      name: iteration_duration
+                      origin: builtin
+                      test_run_id: 152779
+                      type: trend
+                    - id: 4643ca9f-9539-5e86-9937-2ae956f9dcc4
+                      name: data_sent
+                      origin: builtin
+                      test_run_id: 152779
+                      type: counter
+          description: OK.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+  /cloud/v5/load_tests/{loadTestId}/metrics:
+    get:
+      operationId: load_test_metrics_list
+      summary: List metrics across the last 30 runs of a load test.
+      description: |-
+        Returns metrics metadata aggregated across the last 30 runs of
+        the load test. Useful for understanding which metrics and
+        labels are available across runs.
+
+        Use `metrics(test_run_count={testRunCount})` to choose a
+        different number of recent runs, or
+        `metrics(test_run_ids=[{testRunIds}])` to choose specific runs.
+
+        The `/ms` paths are aliases of these `/metrics` paths.
+
+        Per-run breakdown note. The `LoadTestMetric` shape returned
+        by this endpoint does not include a `test_run_id` field, so
+        callers cannot tell from the response alone which runs went
+        into the aggregate. To discover the contributing run IDs,
+        issue a `query_aggregate_k6(...)` call with the same
+        `test_run_count` (or `test_run_ids`) and inspect the
+        `test_run_id` label on each row of the result.
+      tags:
+      - metrics
+      security:
+      - k6ApiToken: []
+      parameters:
+      - in: path
+        name: loadTestId
+        required: true
+        schema:
+          type: integer
+          format: int64
+        description: ID of the load test.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadTestMetricListResponse'
+              examples:
+                OK:
+                  value:
+                    value:
+                    - name: http_req_duration
+                      type: trend
+                      labels: [expected_response, group, method, name, proto, scenario, status, url]
+                    - name: http_reqs
+                      type: counter
+                      labels: [expected_response, group, method, name, proto, scenario, status, url]
+                    - name: vus
+                      type: gauge
+                      labels: [load_zone]
+          description: OK.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+  '/cloud/v5/load_tests/{loadTestId}/metrics(test_run_count={testRunCount})':
+    get:
+      operationId: load_test_metrics_list_by_count
+      x-odata-function-call:
+        name: metrics
+        parameters:
+        - name: test_run_count
+          type: Edm.Int64
+          required: true
+          description: |-
+            Number of most-recent runs to include. `0` is silently
+            treated as the default count; values larger than the
+            number of available runs are silently capped; negative
+            values return HTTP 403 'Validation failed'.
+      summary: List metrics across the last N runs of a load test.
+      description: |-
+        Returns metrics metadata aggregated across the last
+        `testRunCount` runs of the load test.
+
+        Wire format note. `test_run_count` is part of the path's
+        parenthesized function-call syntax, not a conventional query
+        string parameter.
+
+        Bounds and silent quirks of `test_run_count`:
+          * Negative values (`-1`, `-2`, ...) return HTTP 403 with
+            `error.message: "Validation failed"` (see `Forbidden`).
+          * Zero is silently treated as the default (≈ last 30
+            runs); the response is the same as calling
+            `/metrics` without the function-call.
+          * Values larger than the number of available runs are
+            silently capped at the number of available runs.
+          * Non-integer numeric literals (e.g. `1.5`) return HTTP
+            400 with the `validation_error` envelope (see
+            `BadRequest`).
+      tags:
+      - metrics
+      security:
+      - k6ApiToken: []
+      parameters:
+      - in: path
+        name: loadTestId
+        required: true
+        schema:
+          type: integer
+          format: int64
+        description: ID of the load test.
+      - in: path
+        name: testRunCount
+        required: true
+        schema:
+          type: integer
+          minimum: 0
+        description: |-
+          Number of most-recent runs to include. Must be non-negative
+          (negative -> 403 `"Validation failed"`). `0` is silently
+          treated as the default count; larger values are silently
+          capped at the number of available runs.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadTestMetricListResponse'
+          description: OK.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+  '/cloud/v5/load_tests/{loadTestId}/metrics(test_run_ids=[{testRunIds}])':
+    get:
+      operationId: load_test_metrics_list_by_ids
+      x-odata-function-call:
+        name: metrics
+        parameters:
+        - name: test_run_ids
+          type: Collection(Edm.Int64)
+          required: true
+          description: |-
+            Test run IDs to aggregate. Must contain at least one ID;
+            an empty list (`[]`) returns 404. Unknown IDs (including
+            `0`) are silently filtered to value=[]. Whitespace
+            between elements is tolerated.
+      summary: List metrics across specific runs of a load test.
+      description: |-
+        Returns metrics metadata aggregated across the selected test run
+        IDs for the load test.
+
+        Wire format note. `test_run_ids` is part of the path's
+        parenthesized function-call syntax, not a conventional query
+        string parameter. The square brackets are literal; the
+        `testRunIds` placeholder is the comma-separated content inside
+        them, e.g. `152779,152782,152785`.
+
+        Bounds and silent quirks of `test_run_ids`:
+          * The list must contain at least one ID. An empty list
+            (`test_run_ids=[]`) returns HTTP 404 (`Expected end of
+            text, found '('`) -- see `NotFound`.
+          * IDs that do not belong to the load test (including
+            `0` and arbitrary unknown values) are silently filtered
+            out; the response is HTTP 200 with `value: []` when no
+            IDs in the list match.
+          * Whitespace between IDs (`[a, b]` with a space after the
+            comma) is tolerated by the OData parser.
+      tags:
+      - metrics
+      security:
+      - k6ApiToken: []
+      parameters:
+      - in: path
+        name: loadTestId
+        required: true
+        schema:
+          type: integer
+          format: int64
+        description: ID of the load test.
+      - in: path
+        name: testRunIds
+        required: true
+        schema:
+          type: string
+        description: |-
+          Comma-separated test run IDs inside literal square brackets.
+          Must contain at least one ID; an empty list returns 404.
+          Unknown IDs are silently filtered.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadTestMetricListResponse'
+          description: OK.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+  /cloud/v5/load_tests/{loadTestId}/ms:
+    get:
+      operationId: load_test_metrics_ms_alias_list
+      summary: Alias for listing metrics across the last 30 runs.
+      description: |-
+        Alias of `/cloud/v5/load_tests/{loadTestId}/metrics`. The k6 UI
+        uses this path to avoid browser ad blockers; API callers may use
+        either path.
+      tags:
+      - metrics
+      security:
+      - k6ApiToken: []
+      parameters:
+      - in: path
+        name: loadTestId
+        required: true
+        schema:
+          type: integer
+          format: int64
+        description: ID of the load test.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadTestMetricListResponse'
+          description: OK.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+  '/cloud/v5/load_tests/{loadTestId}/ms(test_run_count={testRunCount})':
+    get:
+      operationId: load_test_metrics_ms_alias_by_count
+      x-odata-function-call:
+        name: ms
+        parameters:
+        - name: test_run_count
+          type: Edm.Int64
+          required: true
+          description: |-
+            Alias of the same parameter on `load_test_metrics_list_by_count`.
+            See that operation's `x-odata-function-call` for the bounds
+            and silent quirks.
+      summary: Alias for listing metrics across the last N runs.
+      description: |-
+        Alias of
+        `/cloud/v5/load_tests/{loadTestId}/metrics(test_run_count={testRunCount})`.
+        See that operation's description for the bounds and silent
+        quirks of `test_run_count` (`0` -> default, negative -> 403
+        `"Validation failed"`, `1.5` -> 400 `validation_error`,
+        silent cap at available runs).
+      tags:
+      - metrics
+      security:
+      - k6ApiToken: []
+      parameters:
+      - in: path
+        name: loadTestId
+        required: true
+        schema:
+          type: integer
+          format: int64
+        description: ID of the load test.
+      - in: path
+        name: testRunCount
+        required: true
+        schema:
+          type: integer
+          minimum: 0
+        description: |-
+          Number of most-recent runs to include. Must be non-negative
+          (negative -> 403 `"Validation failed"`). `0` is silently
+          treated as the default count; larger values are silently
+          capped at the number of available runs.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadTestMetricListResponse'
+          description: OK.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+  '/cloud/v5/load_tests/{loadTestId}/ms(test_run_ids=[{testRunIds}])':
+    get:
+      operationId: load_test_metrics_ms_alias_by_ids
+      x-odata-function-call:
+        name: ms
+        parameters:
+        - name: test_run_ids
+          type: Collection(Edm.Int64)
+          required: true
+          description: |-
+            Alias of the same parameter on `load_test_metrics_list_by_ids`.
+            See that operation's `x-odata-function-call` for the bounds
+            and silent quirks.
+      summary: Alias for listing metrics across specific runs.
+      description: |-
+        Alias of
+        `/cloud/v5/load_tests/{loadTestId}/metrics(test_run_ids=[{testRunIds}])`.
+        See that operation's description for the bounds and silent
+        quirks of `test_run_ids` (empty list `[]` -> 404; unknown
+        IDs silently filtered; whitespace tolerated after commas).
+      tags:
+      - metrics
+      security:
+      - k6ApiToken: []
+      parameters:
+      - in: path
+        name: loadTestId
+        required: true
+        schema:
+          type: integer
+          format: int64
+        description: ID of the load test.
+      - in: path
+        name: testRunIds
+        required: true
+        schema:
+          type: string
+        description: |-
+          Comma-separated test run IDs inside literal square brackets.
+          Must contain at least one ID; an empty list returns 404.
+          Unknown IDs are silently filtered.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadTestMetricListResponse'
+          description: OK.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+  /cloud/v5/test_runs/{testRunId}/series:
+    get:
+      operationId: test_run_series_list
+      summary: List time series of a test run by label-matcher.
+      description: |-
+        Lists the time series available in the test run that match one
+        or more series selectors. Output shape mirrors the Prometheus
+        series API (https://prometheus.io/docs/prometheus/latest/querying/api/#finding-series-by-label-matchers).
+
+        At least one `match[]` argument is required. The match
+        expression syntax is the same Prometheus label-matcher syntax
+        used by the `metric` parameter of the query endpoints.
+      tags:
+      - metrics
+      security:
+      - k6ApiToken: []
+      parameters:
+      - in: path
+        name: testRunId
+        required: true
+        schema:
+          type: integer
+          format: int64
+        description: ID of the test run.
+      - in: query
+        name: match[]
+        required: true
+        schema:
+          type: array
+          items:
+            type: string
+        description: |-
+          Repeatable series-selector argument. Each value is a metric
+          name optionally followed by a curly-brace label matcher,
+          matching Prometheus selector syntax. Example:
+          `match[]=http_req_duration{expected_response="true"}`.
+
+          Prometheus deviation. Selectors must start with a metric
+          name; a bare label-only selector such as
+          `{__name__="http_req_duration"}` (which standard Prometheus
+          accepts) is rejected with HTTP 400 `"Failed to parse vector
+          selector"`.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromSeriesResponse'
+              examples:
+                OK:
+                  value:
+                    status: success
+                    data:
+                    - __name__: http_req_duration
+                      expected_response: 'true'
+                      group: '::g2'
+                      load_zone: amazon:us:columbus
+                      method: GET
+                      name: http://test.k6.io/
+                      proto: HTTP/1.1
+                      scenario: http_with_groups
+                      status: '200'
+                      test_run_id: '152777'
+                      url: http://test.k6.io/
+          description: OK.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+  /cloud/v5/test_runs/{testRunId}/labels:
+    get:
+      operationId: test_run_labels_list
+      summary: List label names available in a test run.
+      description: |-
+        Returns the set of label names available in the test run.
+        Output shape mirrors the Prometheus labels API
+        (https://prometheus.io/docs/prometheus/latest/querying/api/#getting-label-names).
+      tags:
+      - metrics
+      security:
+      - k6ApiToken: []
+      parameters:
+      - in: path
+        name: testRunId
+        required: true
+        schema:
+          type: integer
+          format: int64
+        description: ID of the test run.
+      - in: query
+        name: match[]
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+        description: |-
+          Optional repeatable series selector. Restricts the returned
+          label names to those used by series matching any of the given
+          selectors. Same syntax (and same Prometheus deviation) as the
+          `/series` endpoint.
+
+          Known server bug. At the time of writing, supplying `match[]`
+          on the `/labels` endpoint causes the server to return
+          HTTP 500 `{"error": {"code": "error", "message": "Unknown
+          error"}}` regardless of selector. Workaround: omit `match[]`
+          and post-filter client-side, or use `/series` instead. The
+          same parameter on `/label/{labelName}/values` is unaffected
+          by this bug.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromLabelNamesResponse'
+              examples:
+                OK:
+                  value:
+                    status: success
+                    data: [__name__, expected_response, group, load_zone, method, name, proto, scenario, status, test_run_id, url]
+          description: OK.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+  /cloud/v5/test_runs/{testRunId}/label/{labelName}/values:
+    get:
+      operationId: test_run_label_values_list
+      summary: List values seen for a single label in a test run.
+      description: |-
+        Returns the distinct values seen for one label in the test run.
+        Output shape mirrors the Prometheus label-values API
+        (https://prometheus.io/docs/prometheus/latest/querying/api/#querying-label-values).
+      tags:
+      - metrics
+      security:
+      - k6ApiToken: []
+      parameters:
+      - in: path
+        name: testRunId
+        required: true
+        schema:
+          type: integer
+          format: int64
+        description: ID of the test run.
+      - in: path
+        name: labelName
+        required: true
+        schema:
+          type: string
+        description: |-
+          Label name to enumerate values for, e.g. `load_zone`, `status`.
+      - in: query
+        name: match[]
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+        description: |-
+          Optional repeatable series selector. Restricts the returned
+          label values to those seen in series matching any of the
+          given selectors. Same syntax (and same Prometheus deviation)
+          as the `/series` endpoint.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromLabelValuesResponse'
+              examples:
+                OK:
+                  value:
+                    status: success
+                    data: [amazon:us:columbus, amazon:eu:dublin]
+          description: OK.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+  '/cloud/v5/test_runs/{testRunId}/query_range_k6({parameters})':
+    get:
+      operationId: test_run_query_range_k6
+      x-odata-function-call:
+        name: query_range_k6
+        parameters:
+        - name: query
+          type: Edm.String
+          required: true
+          description: |-
+            Query expression. Must be compatible with the metric's
+            `type` (see TestRunMetric.type). Single-quoted on the
+            wire.
+        - name: metric
+          type: Edm.String
+          required: true
+          description: |-
+            Metric name with optional Prometheus-style label selector.
+            Selectors must start with a metric name; bare label-only
+            selectors are rejected with 400 (Prometheus deviation).
+            Unknown metric -> 200 with empty matrix.
+
+            Label-selector operators (Prometheus subset):
+              * `=`  -- equal to the given string,
+              * `!=` -- not equal,
+              * `=~` -- regex match,
+              * `!~` -- regex non-match.
+
+            Examples:
+              * `http_req_duration`
+              * `http_req_duration{status="200"}`
+              * `http_req_duration{status=~"(2|3)\d\d"}`
+              * `http_req_duration{status!="0",name="login page"}`
+        - name: step
+          type: Edm.Int64
+          required: false
+          description: |-
+            Positive integer seconds. `step=0` and negative values
+            currently return HTTP 500 (known server bug).
+        - name: start
+          type: Edm.DateTimeOffset
+          required: false
+          description: |-
+            Bare OData literal -- NOT single-quoted. Must include a
+            timezone designator (`Z` or `+HH:MM`). Defaults to test
+            run start.
+        - name: end
+          type: Edm.DateTimeOffset
+          required: false
+          description: |-
+            Bare OData literal -- NOT single-quoted. Must include a
+            timezone designator (`Z` or `+HH:MM`). Defaults to test
+            run end.
+      summary: Range query returning a metric time series over a range.
+      description: |-
+        Returns multiple sample values for a given metric over a time
+        range, similar to the Prometheus range-query API
+        (https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries).
+
+        Wire format note. The arguments are passed in OData-style
+        function-call syntax embedded in the URL path itself, not as
+        conventional `?key=...` query string parameters. Actual wire
+        form:
+
+            /cloud/v5/test_runs/152779/query_range_k6(query='increase by (name,status)',metric='http_reqs{status!="0"}',step=5)
+
+        String values must be wrapped in single quotes; when invoking
+        from a shell, wrap the entire URL in double quotes so the inner
+        single quotes survive shell parsing.
+
+        Query-expression syntax. The `query` argument names a
+        function applied to the metric to produce values. The
+        function is built from three nesting levels: a basic method
+        (required), an optional `by (...)` clause for label
+        preservation, and an optional aggregator wrapper for
+        across-label aggregation. The authoritative reference is the
+        k6 docs at
+        https://grafana.com/docs/grafana-cloud/testing/k6/reference/cloud-rest-api/metrics/
+
+        Basic methods. The set of valid methods depends on the
+        metric's `type` (see `TestRunMetric.type`). An incompatible
+        pair returns HTTP 400 with a message of the form
+        `"Metric query expression not found: <query> for metric
+        type <type>"`.
+
+        Each method's PromQL equivalent (where applicable) is
+        included below. The mappings are taken from the official
+        docs and describe how the v5 server expands the k6 method
+        against the backing Prometheus-shaped store; callers that
+        need to issue equivalent queries against a raw Prometheus
+        instance can use them directly. Methods marked
+        "(no PromQL equivalent)" are computed server-side without
+        a direct Prom translation.
+
+          * counter:
+              - `increase` -- total increase over the time span
+                (e.g. number of requests for `http_reqs`).
+                PromQL: `increase(metric_name[$__interval])`.
+              - `rate` -- average increase per second.
+                PromQL: `rate(metric_name[$__interval])`.
+              - `value` -- growing counter value.
+                PromQL: `metric_name`.
+              - `cumrate` -- cumulative rate from test run start
+                (`value` / time elapsed since test run start).
+                (No PromQL equivalent.)
+              - `max_rate(<interval>)` -- max `rate` per
+                `<interval>` seconds within the time span; the
+                integer-seconds sub-parameter is required. Used e.g.
+                for the "peak RPS" value in test run stats.
+                PromQL:
+                `max_over_time(rate(metric_name[<interval>])[$__interval:<interval>])`.
+                Note: at the time of writing this method returns
+                HTTP 400
+                `"Metric query expression not found: max_rate(N) for
+                metric type counter"` on the live API; documented
+                here for parity with the docs page.
+
+          * gauge:
+              - `last` -- last observed value.
+                PromQL: `metric_name`.
+              - `min` -- min observed value.
+                PromQL: `min_over_time(metric_name[$__interval])`.
+              - `max` -- max observed value.
+                PromQL: `max_over_time(metric_name[$__interval])`.
+              - `avg` -- average of observed values.
+                PromQL: `avg_over_time(metric_name[$__interval])`.
+              - `last_time` -- timestamp of the last observed value.
+                PromQL: `timestamp(metric_name)`. Note: at the time
+                of writing this method returns HTTP 500 `"Unknown
+                error"` on the live API; documented here for parity
+                with the docs page.
+
+          * rate:
+              - `increase_total` -- total increase of the
+                all-observations counter in the time span.
+                PromQL: `increase(metric_name[$__interval])`.
+              - `rate_total` -- average increase per second of the
+                all-observations counter.
+                PromQL: `rate(metric_name[$__interval])`.
+              - `value_total` -- growing value of the all-
+                observations counter.
+                PromQL: `metric_name`.
+              - `increase_nz` -- total increase of the
+                nonzero-value observations counter in the time span.
+                PromQL:
+                `increase(metric_name{nonzero="true"}[$__interval])`.
+              - `rate_nz` -- average increase per second of the
+                nonzero-value observations counter.
+                PromQL:
+                `rate(metric_name{nonzero="true"}[$__interval])`.
+              - `value_nz` -- growing value of the nonzero-value
+                observations counter.
+                PromQL: `metric_name{nonzero="true"}`.
+              - `increase_z` -- total increase of the zero-value
+                observations counter in the time span.
+                PromQL:
+                `increase(metric_name{nonzero="false"}[$__interval])`.
+              - `rate_z` -- average increase per second of the
+                zero-value observations counter.
+                PromQL:
+                `rate(metric_name{nonzero="false"}[$__interval])`.
+              - `value_z` -- growing value of the zero-value
+                observations counter.
+                PromQL: `metric_name{nonzero="false"}`.
+              - `ratio` -- nonzero-value increase divided by total
+                increase (i.e. fraction of nonzero observations).
+                PromQL:
+                `increase(metric_name{nonzero="false"}[$__interval])
+                / increase(metric_name[$__interval])`.
+
+          * trend (k6 trends are histogram-backed):
+              - `histogram_max`, `histogram_min`, `histogram_avg`,
+                `histogram_stddev` -- standard summary statistics.
+                (No PromQL equivalent.)
+              - `histogram_quantile(<q>)` -- quantile of the
+                histogram; `<q>` is a real number in the range
+                `(0, 1)`. Required sub-parameter.
+                PromQL:
+                `histogram_quantile(<q>, rate(hist_metric_name_bucket[$__interval]))`.
+              - `histogram_count_increase` -- increase of the
+                histogram's observations counter.
+                PromQL:
+                `increase(hist_metric_name_count[$__interval])`.
+              - `histogram_count_value` -- growing value of the
+                same counter.
+                PromQL: `hist_metric_name`.
+
+        `by (<labels>)` clause. Append `by (<l1,l2,...>)` to a
+        basic method to preserve those labels and return multiple
+        time series (one row per unique label-value combination).
+        Examples:
+          * `rate by (name,status)`
+          * `histogram_quantile(0.95) by (name,method,status)`
+
+        Aggregator wrappers. Wrap a (possibly by-claused) method
+        in `min(...)`, `max(...)`, `sum(...)`, or `avg(...)` to
+        further aggregate across labels. The wrapper itself can
+        carry its own `by (...)` clause to choose which labels to
+        keep on the output. Examples:
+          * `sum(last by (instance_id))` -- active VUs summed
+            across instances,
+          * `avg(rate by (name,method)) by (method)` -- average
+            request rate across URLs, separated by HTTP method,
+          * `avg(max by (instance))` -- peak per-instance value,
+            averaged across instances.
+
+        Unknown-metric note. An unrecognised metric name (e.g.
+        `metric='no_such_metric'`) is not an error: the response is
+        HTTP 200 with `data.resultType: "matrix"` and an empty
+        `data.result` array, matching Prometheus's
+        "no-matching-series-is-empty-not-error" semantics.
+
+        Precedence note. The unknown-metric -> 200-empty behaviour
+        takes priority over the incompatible query/type -> 400 check.
+        If a metric does not exist in the test run, the API returns
+        200-empty regardless of whether the `query` expression is
+        compatible with the metric type. The 400 incompatible-type
+        error only fires when the metric is present.
+
+        `step` note. `step` must be a positive integer. The values
+        `step=0` and negative values currently return HTTP 500
+        `{"error": {"code": "error", "message": "Unknown error"}}`
+        rather than 400 -- see the file-level Error-handling section
+        for the known-bug list.
+      tags:
+      - metrics
+      security:
+      - k6ApiToken: []
+      parameters:
+      - in: path
+        name: testRunId
+        required: true
+        schema:
+          type: integer
+          format: int64
+        description: ID of the test run.
+      - in: path
+        name: parameters
+        required: true
+        schema:
+          type: string
+        description: |-
+          Comma-separated function-call arguments. Required keys:
+          `query` (query expression) and `metric` (metric name with
+          optional selector). Optional keys: `step` (positive integer
+          seconds), `start`, and `end`.
+
+          String keys (`query`, `metric`) must be wrapped in single
+          quotes. Numeric keys (`step`) are bare.
+
+          Datetime keys (`start`, `end`) are bare OData
+          `Edm.DateTimeOffset` literals -- *not* single-quoted -- and
+          must include a timezone designator (`Z` or `+HH:MM`).
+          `start` defaults to test run start; `end` defaults to test
+          run end. Examples of valid forms:
+          `start=2025-01-01T00:00:00Z` and
+          `start=2025-01-01T00:00:00+00:00`. Single-quoting a
+          datetime triggers a 400 `validation_error` (see
+          `BadRequest`); omitting the timezone triggers a 404
+          `ParseException` (see `NotFound`).
+
+          Example:
+          `query='increase by (name,status)',metric='http_reqs{status!="0"}',step=5`.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromMatrixResponse'
+              examples:
+                OK:
+                  value:
+                    status: success
+                    data:
+                      resultType: matrix
+                      result:
+                      - metric:
+                          __name__: http_reqs
+                          name: login page
+                          status: '200'
+                          test_run_id: '152779'
+                        values:
+                        - [1684949415.0, 845.0]
+                        - [1684949420.0, 1034.0]
+          description: OK.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+  '/cloud/v5/test_runs/{testRunId}/query_aggregate_k6({parameters})':
+    get:
+      operationId: test_run_query_aggregate_k6
+      x-odata-function-call:
+        name: query_aggregate_k6
+        parameters:
+        - name: query
+          type: Edm.String
+          required: true
+          description: |-
+            Query expression. Same syntax (basic methods, `by (...)`
+            clause, aggregator wrappers), same metric-type
+            compatibility rules, and same unknown-metric semantics as
+            `query_range_k6`; see that operation's description for
+            the per-type method tables. Single-quoted on the wire.
+        - name: metric
+          type: Edm.String
+          required: true
+          description: |-
+            Metric name with optional Prometheus-style label selector.
+            Same syntax and operator set (`=`, `!=`, `=~`, `!~`) as
+            on `query_range_k6`; see that operation's description.
+        - name: start
+          type: Edm.DateTimeOffset
+          required: false
+          description: |-
+            Bare OData literal (must include timezone). Defaults to
+            test run start.
+        - name: end
+          type: Edm.DateTimeOffset
+          required: false
+          description: |-
+            Bare OData literal (must include timezone). Defaults to
+            test run end.
+      summary: Aggregate query returning a single value for a metric.
+      description: |-
+        Returns a single sample value for a given metric over the
+        duration of the test run (or a sub-range of it). Output shape
+        mirrors the Prometheus range-query API.
+
+        Wire format note. The arguments are passed in OData-style
+        function-call syntax embedded in the URL path itself, not as
+        conventional `?key=...` query string parameters. Actual wire
+        form:
+
+            /cloud/v5/test_runs/152779/query_aggregate_k6(query='histogram_quantile(0.95) by (name,status)',metric='http_req_duration')
+
+        String values must be wrapped in single quotes. The same
+        metric-type / query-expression compatibility rules, the
+        unknown-metric -> 200-empty behaviour, and the
+        bare-OData-datetime requirements for `start`/`end` all apply
+        here as for `query_range_k6`; see that operation's description.
+      tags:
+      - metrics
+      security:
+      - k6ApiToken: []
+      parameters:
+      - in: path
+        name: testRunId
+        required: true
+        schema:
+          type: integer
+          format: int64
+        description: ID of the test run.
+      - in: path
+        name: parameters
+        required: true
+        schema:
+          type: string
+        description: |-
+          Comma-separated function-call arguments. Required keys:
+          `query` (query expression) and `metric` (metric name with
+          optional selector).
+
+          Optional keys: `start` and `end`, both bare OData
+          `Edm.DateTimeOffset` literals (no surrounding quotes, must
+          include a timezone designator -- see `query_range_k6` for
+          the full rule). `start` defaults to test run start; `end`
+          defaults to test run end.
+
+          Example:
+          `query='histogram_quantile(0.95) by (name,status)',metric='http_req_duration'`.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromVectorResponse'
+              examples:
+                OK:
+                  value:
+                    status: success
+                    data:
+                      resultType: vector
+                      result:
+                      - metric:
+                          __name__: http_req_duration
+                          name: http://test.k6.io/?q=2
+                          status: '200'
+                          test_run_id: '152779'
+                        values:
+                        - [1684950639.0, 14207.0]
+          description: OK.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+  '/cloud/v5/load_tests/{loadTestId}/query_aggregate_k6({parameters})':
+    get:
+      operationId: load_test_query_aggregate_k6
+      x-odata-function-call:
+        name: query_aggregate_k6
+        parameters:
+        - name: query
+          type: Edm.String
+          required: true
+          description: |-
+            Query expression. Same syntax (basic methods, `by (...)`
+            clause, aggregator wrappers) as `query_range_k6`; see
+            that operation's description for the per-type method
+            tables. Single-quoted on the wire.
+
+            NB: unlike the single-run sibling, the metric-type /
+            query-expression compatibility check is NOT enforced
+            here -- an incompatible pair returns 200-empty rather
+            than 400. Pre-validate client-side if you need the 400.
+        - name: metric
+          type: Edm.String
+          required: true
+          description: |-
+            Metric name with optional Prometheus-style label selector.
+            Same syntax and operator set (`=`, `!=`, `=~`, `!~`) as
+            on `query_range_k6`; see that operation's description.
+        - name: test_run_count
+          type: Edm.Int64
+          required: false
+          description: |-
+            Mutually exclusive with `test_run_ids`; exactly one of
+            the two is required (sending both or neither -> 404).
+            Negative values -> 403 'Validation failed'.
+        - name: test_run_ids
+          type: Collection(Edm.Int64)
+          required: false
+          description: |-
+            Mutually exclusive with `test_run_count`; exactly one of
+            the two is required (sending both or neither -> 404).
+            Empty list (`[]`) -> 404; unknown IDs silently filtered.
+        - name: start
+          type: Edm.DateTimeOffset
+          required: false
+          description: Bare OData literal (must include timezone).
+        - name: end
+          type: Edm.DateTimeOffset
+          required: false
+          description: Bare OData literal (must include timezone).
+        constraints:
+        - Exactly one of `test_run_count` and `test_run_ids` must be present.
+      summary: Aggregate query across multiple test runs of a load test.
+      description: |-
+        Applies the same aggregate query to multiple runs in the same
+        load test. Results for different runs are distinguished by the
+        `test_run_id` label in the response. Useful for analysing
+        changes in test run results over time.
+
+        Wire format note. The arguments are passed in OData-style
+        function-call syntax embedded in the URL path itself, not as
+        conventional `?key=...` query string parameters. Actual wire
+        form (querying the last N runs):
+
+            /cloud/v5/load_tests/1529/query_aggregate_k6(query='histogram_quantile(0.95)',metric='http_req_duration',test_run_count=10)
+
+        Or querying specific runs by ID:
+
+            /cloud/v5/load_tests/1529/query_aggregate_k6(query='histogram_quantile(0.95)',metric='http_req_duration',test_run_ids=[152779,152782,152785])
+
+        Pass exactly one of `test_run_count` and `test_run_ids`. The
+        server returns 404 (OData ParseException) if both are present
+        or both are omitted -- see `NotFound` Category 1.
+
+        Response-shape note. The single-run sibling
+        `/cloud/v5/test_runs/{testRunId}/query_aggregate_k6(...)`
+        returns `resultType: "vector"`, but this multi-run variant
+        returns `resultType: "matrix"` (one row per run, partitioned
+        by the `test_run_id` label). The shape is otherwise
+        identical, so this spec models both with the same
+        `PromMatrixResponse` / `PromVectorResponse` schemas.
+
+        Compatibility-check note. The single-run sibling enforces
+        the metric-type / query-expression compatibility rules
+        documented on `test_run_query_range_k6` (an incompatible
+        pair returns HTTP 400). This multi-run endpoint does NOT
+        enforce those rules: an incompatible pair (e.g. `rate` on
+        a trend metric) returns HTTP 200 with an empty matrix
+        (`data.resultType: "matrix"`, `data.result: []`),
+        indistinguishable from the unknown-metric case. Callers
+        that need the 400 must either pre-validate the metric type
+        client-side (via `/test_runs/{id}/metrics` -> `type`) or
+        issue the same query against the single-run endpoint as a
+        canary before fanning out.
+      tags:
+      - metrics
+      security:
+      - k6ApiToken: []
+      parameters:
+      - in: path
+        name: loadTestId
+        required: true
+        schema:
+          type: integer
+          format: int64
+        description: ID of the load test.
+      - in: path
+        name: parameters
+        required: true
+        schema:
+          type: string
+        description: |-
+          Comma-separated function-call arguments. Required keys:
+          `query` (query expression), `metric` (metric name with
+          optional selector), and exactly one of `test_run_count` or
+          `test_run_ids`. String values are single-quoted. Examples:
+          `query='histogram_quantile(0.95)',metric='http_req_duration',test_run_count=10`
+          and
+          `query='histogram_quantile(0.95)',metric='http_req_duration',test_run_ids=[152779,152782,152785]`.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromMatrixResponse'
+              examples:
+                OK:
+                  value:
+                    status: success
+                    data:
+                      resultType: matrix
+                      result:
+                      - metric:
+                          __name__: http_req_duration
+                          test_run_id: '152779'
+                        values:
+                        - [1684950639.0, 14207.0]
+                      - metric:
+                          __name__: http_req_duration
+                          test_run_id: '152782'
+                        values:
+                        - [1684950835.0, 28031.0]
+          description: OK.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+components:
+  schemas:
+    TestRunMetric:
+      type: object
+      title: TestRunMetric
+      description: One metric emitted by a test run.
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the metric.
+        name:
+          type: string
+          description: |-
+            Metric name (e.g. `http_req_duration`, `vus`, `data_sent`).
+        origin:
+          type: string
+          description: |-
+            Where the metric was emitted from. Known values at the
+            time of writing:
+              * `"builtin"` -- built-in k6 metrics (e.g.
+                `http_req_duration`, `vus`, `data_sent`,
+                `browser_*`).
+              * `"user"` -- user-defined metrics declared via
+                `k6/metrics` in the test script.
+            Treat this as an open enum; future k6 releases may add
+            new origin values.
+        test_run_id:
+          type: integer
+          format: int64
+          description: ID of the test run that emitted the metric.
+        type:
+          type: string
+          description: Metric type.
+          enum: [counter, gauge, rate, trend]
+      required: [id, name, origin, test_run_id, type]
+    TestRunMetricListResponse:
+      type: object
+      title: TestRunMetricListResponse
+      properties:
+        value:
+          type: array
+          items:
+            $ref: '#/components/schemas/TestRunMetric'
+      required: [value]
+    LoadTestMetric:
+      type: object
+      title: LoadTestMetric
+      description: |-
+        Metric metadata aggregated across multiple runs of a load test.
+      properties:
+        name:
+          type: string
+          description: Metric name.
+        type:
+          type: string
+          description: |-
+            Metric type. If the type differs across runs, the type from
+            the most-recent run is used.
+          enum: [counter, gauge, rate, trend]
+        labels:
+          type: array
+          description: |-
+            All unique label names seen on this metric across the
+            selected runs.
+          items:
+            type: string
+      required: [name, type, labels]
+    LoadTestMetricListResponse:
+      type: object
+      title: LoadTestMetricListResponse
+      description: |-
+        Multi-run metrics list, returned by every
+        `/cloud/v5/load_tests/{id}/metrics(...)` and `/ms(...)` form
+        (including the no-argument variants that default to the last
+        30 runs).
+
+        Ordering. `value[]` is sorted ASCII-alphabetically by `name`,
+        case-sensitive, with no secondary sort key. Verified live
+        across the plain, `test_run_count`, and `test_run_ids`
+        variants. The single-run sibling
+        (`TestRunMetricListResponse`) does NOT make this guarantee --
+        its `value[]` is returned in metric-emission order.
+      properties:
+        value:
+          type: array
+          items:
+            $ref: '#/components/schemas/LoadTestMetric'
+      required: [value]
+    PromSeriesResponse:
+      type: object
+      title: PromSeriesResponse
+      description: |-
+        Prometheus-shaped series response. `data` is an array of label
+        sets, one per matching time series.
+      properties:
+        status:
+          type: string
+          enum: [success, error]
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties:
+              type: string
+      required: [status, data]
+    PromLabelNamesResponse:
+      type: object
+      title: PromLabelNamesResponse
+      description: |-
+        Prometheus-shaped label-names response. `data` is an array of
+        label names.
+      properties:
+        status:
+          type: string
+          enum: [success, error]
+        data:
+          type: array
+          items:
+            type: string
+      required: [status, data]
+    PromLabelValuesResponse:
+      type: object
+      title: PromLabelValuesResponse
+      description: |-
+        Prometheus-shaped label-values response. `data` is an array of
+        distinct values seen for the requested label.
+      properties:
+        status:
+          type: string
+          enum: [success, error]
+        data:
+          type: array
+          items:
+            type: string
+      required: [status, data]
+    PromMatrixSample:
+      type: object
+      title: PromMatrixSample
+      description: |-
+        One time series in a Prometheus matrix response: a label set
+        plus a sequence of (timestamp, value) samples.
+      properties:
+        metric:
+          type: object
+          additionalProperties:
+            type: string
+          description: Label set identifying the series.
+        values:
+          type: array
+          description: |-
+            Samples, each a `[timestamp, value]` pair. Both elements
+            are JSON numbers (floats on the wire). `timestamp` is a
+            Unix epoch second; `value` is the metric value.
+
+            Prometheus deviation. Standard Prometheus returns
+            `[int_timestamp, "string_value"]`; the v5 API returns
+            `[float_timestamp, float_value]` instead. Clients
+            porting Prometheus response-parsing code should accept
+            numeric values, not quoted strings.
+          items:
+            type: array
+            minItems: 2
+            maxItems: 2
+            items:
+              type: number
+      required: [metric, values]
+    PromMatrixResponse:
+      type: object
+      title: PromMatrixResponse
+      description: |-
+        Range-query result. `data.resultType` is always `matrix`.
+      properties:
+        status:
+          type: string
+          enum: [success, error]
+        data:
+          type: object
+          properties:
+            resultType:
+              type: string
+              enum: [matrix]
+            result:
+              type: array
+              items:
+                $ref: '#/components/schemas/PromMatrixSample'
+          required: [resultType, result]
+      required: [status, data]
+    PromVectorResponse:
+      type: object
+      title: PromVectorResponse
+      description: |-
+        Aggregate-query result for the single-run
+        `/test_runs/{testRunId}/query_aggregate_k6(...)` endpoint.
+        `data.resultType` is the literal `"vector"`; each entry in
+        `result` is a single `[timestamp, value]` sample paired with
+        a label set.
+
+        Prometheus deviation. The entry uses `values` (an array of
+        one `[timestamp, value]` pair) rather than Prometheus's
+        canonical `value` (the bare pair). This keeps the entry shape
+        identical to `PromMatrixSample`, so a single client type can
+        cover both matrix and vector responses.
+
+        The multi-run sibling
+        `/load_tests/{loadTestId}/query_aggregate_k6(...)` uses
+        `PromMatrixResponse` instead -- see that operation's
+        description for the rationale.
+      properties:
+        status:
+          type: string
+          enum: [success, error]
+        data:
+          type: object
+          properties:
+            resultType:
+              type: string
+              enum: [vector]
+            result:
+              type: array
+              items:
+                $ref: '#/components/schemas/PromMatrixSample'
+          required: [resultType, result]
+      required: [status, data]
+    ErrorResponse:
+      type: object
+      title: ErrorResponse
+      description: |-
+        Generic error envelope used by 401, 403, 404, 405, 500, and
+        the simple-envelope subset of 400 responses. `ErrorResponse`
+        provides no machine-readable discriminator: `error.code` is
+        always the literal string `"error"` across every status that
+        uses this shape, so callers needing to distinguish between
+        sub-cases (e.g. the three meanings of 403 -- see
+        `Forbidden`) must regex-match `error.message`. The richer
+        `ValidationErrorResponse` shape (`error.code:
+        "validation_error"`) is used only for the OData
+        type-coercion subset of 400; see `BadRequest`.
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: |-
+                Stable error code. For `ErrorResponse` this is
+                always the literal string `"error"` at the time of
+                writing; `ValidationErrorResponse` (a sibling
+                envelope used for some 400s) uses
+                `"validation_error"`. There is currently no other
+                value, so this field is NOT a useful discriminator
+                inside `ErrorResponse`-typed responses. Treat
+                `message` as the source of truth for sub-classifying
+                an `ErrorResponse`.
+            message:
+              type: string
+              description: Human-readable error description.
+          required: [code, message]
+      required: [error]
+    ValidationErrorResponse:
+      type: object
+      title: ValidationErrorResponse
+      description: |-
+        Richer 400 envelope returned for OData type-validation
+        failures (e.g. quoting a datetime value that should be a bare
+        `Edm.DateTimeOffset` literal). The simpler `ErrorResponse`
+        shape is returned for non-OData 400s such as an unparseable
+        Prometheus selector. A 400 body is one or the other -- see
+        `BadRequest` in `responses` for the `anyOf` glue.
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: |-
+                Stable error code. Observed value: `"validation_error"`.
+            details:
+              type: array
+              description: |-
+                Per-parameter validation errors. Each entry carries
+                the OData-level `code`, a human-readable `message`,
+                and the `target` parameter name.
+              items:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  message:
+                    type: string
+                  target:
+                    type: string
+                required: [code, message, target]
+            message:
+              type: string
+              description: Top-level human-readable error description.
+            target:
+              type: string
+              description: |-
+                Operation name that the validation failure was raised
+                against, e.g. `query_range_k6`.
+          required: [code, details, message, target]
+      required: [error]
+  responses:
+    BadRequest:
+      content:
+        application/json:
+          schema:
+            anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - $ref: '#/components/schemas/ValidationErrorResponse'
+      description: |-
+        Request validation failed *after* the URL parsed cleanly in
+        the OData layer (URL-parse failures are 404 -- see `NotFound`).
+
+        Discriminator note. The two envelopes can be distinguished
+        unambiguously by `error.code`:
+        `"error"` -> `ErrorResponse`; `"validation_error"` ->
+        `ValidationErrorResponse`. The OpenAPI 3 `discriminator`
+        keyword is not declared here because `error.code` is
+        nested rather than top-level (and OpenAPI 3.0 `discriminator`
+        requires a top-level property); strict validators should
+        switch on `error.code` themselves.
+
+        Bodies use one of two envelopes, distinguished by
+        `error.code`:
+
+        `ErrorResponse` (`error.code == "error"`):
+          * `/series` called with no `match[]` argument.
+          * `query_range_k6(...)` / `query_aggregate_k6(...)` with an
+            unparseable Prometheus selector.
+          * A query expression incompatible with the metric type
+            (e.g. `rate` on a trend metric).
+
+        `ValidationErrorResponse` (`error.code == "validation_error"`):
+          * An OData literal that parsed cleanly but failed type
+            coercion against the parameter's declared `Edm.*` type.
+            `error.details[]` lists every offending parameter by
+            `target`. Examples seen in practice:
+              - `test_run_count=1.5` -- `Decimal('1.5')` does not
+                coerce to `Edm.Int64`.
+              - `start='2025-01-01T00:00:00Z'` -- a quoted string does
+                not coerce to `Edm.DateTimeOffset`.
+    Unauthorized:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: |-
+        Missing, malformed, or revoked token. Body is `ErrorResponse`.
+        Observed `error.message` values: `"Authentication required"`
+        (no header) and `"Invalid token"` (header present, token
+        unrecognised).
+    Forbidden:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: |-
+        Two distinct cases share this status code; distinguish them by
+        `error.message`:
+
+        `"Authentication error - could not find or access requested
+        resource."` -- the caller is not authorised to access the
+        resource, OR the resource does not exist. The v5 API
+        deliberately conflates these two so it does not leak which
+        test-run / load-test IDs exist (404 is NOT used for missing
+        resources -- see `NotFound` for the distinct URL-parse 404
+        case).
+
+        `"Validation failed"` -- a server-side validator rejected a
+        function-call argument. Currently observed for negative
+        `test_run_count` on the multi-run operations
+        (`load_tests/{id}/metrics(test_run_count=-N)`,
+        `load_tests/{id}/ms(test_run_count=-N)`,
+        `load_tests/{id}/query_aggregate_k6(...,test_run_count=-N)`).
+        This is best thought of as a "should-have-been-400 but the
+        framework picked 403" quirk; callers wanting to distinguish
+        "no access" from "bad input" must inspect the message text.
+
+        Schema-discriminator limitation. Both 403 cases currently
+        share `error.code: "error"` (the literal string -- see
+        ErrorResponse.error.code), so no machine-readable
+        discriminator exists. Generated clients must regex-match
+        `error.message` to differentiate, which is brittle against
+        server-side wording changes. A future server fix should
+        introduce a distinct `error.code` value (e.g.
+        `"validation_error"`) for the "Validation failed" case so
+        callers can branch on a stable identifier; until then this
+        spec lists only the prose distinction.
+    NotFound:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: |-
+        The URL did not match any OData route. Body is `ErrorResponse`
+        whose `message` is the OData parser's `ParseException` text.
+        Two broad categories of trigger -- the spec declares 404 on
+        every operation because the second category applies
+        regardless of whether the path uses function-call syntax.
+
+        Category 1: function-call signature mismatch (function-call
+        operations only):
+          * `query_range_k6(metric='...',step=5)` -- missing required
+            `query=` key.
+          * `query_range_k6(...,bogus=1)` -- unrecognised key.
+          * `query_range_k6(...,step=not-a-number)` -- value of the
+            wrong literal type.
+          * `query_range_k6(...,start=2025-01-01T00:00:00)` --
+            timezone-naive datetime.
+          * `load_tests/{id}/query_aggregate_k6(...)` with both
+            `test_run_count` and `test_run_ids` (or neither).
+          * `metrics(test_run_ids=[])` -- empty bracket list.
+
+        Category 2: structural URL faults that apply to any
+        operation:
+          * Trailing slash: `/test_runs/{id}/metrics/`.
+          * Non-numeric value where a numeric ID was expected:
+            `/test_runs/abc/metrics` or `/load_tests/abc/metrics`.
+
+        Category 3: endpoint-dependent unrecognised query-string
+        parameter. The OData parser rejects unrecognised
+        query-string parameters with 404 ONLY on routes it treats
+        as function-call endpoints; routes treated as plain entity-
+        set GETs silently ignore the parameter and return 200.
+        Observed at the time of writing:
+          * 404: `/test_runs/{id}/labels?foo=bar`,
+                 `/test_runs/{id}/label/{name}/values?foo=bar`,
+                 `/test_runs/{id}/series?foo=bar` (no `match[]`),
+                 `/load_tests/{id}/metrics?foo=bar`.
+          * 200 (parameter silently dropped):
+                 `/test_runs/{id}/metrics?foo=bar`,
+                 `/test_runs/{id}/series?foo=bar&match[]=<valid>`.
+        There is no public API for determining which route shape a
+        path uses; consumers that need the 404 guarantee should
+        validate request URLs client-side.
+
+        Distinct from "resource not found", which is 403 -- see
+        `Forbidden`.
+    MethodNotAllowed:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: |-
+        Returned for any non-GET method (POST, PUT, PATCH, DELETE)
+        on a v5 metrics path. Body is `ErrorResponse`. At the time
+        of writing `error.message` is the uninformative literal
+        `"Error"` (with no indication of which method was
+        attempted or which methods are allowed); treat this
+        wording as observed-but-not-contract -- a future server
+        improvement may replace it with a more descriptive
+        message, so callers should NOT hard-match on the exact
+        string `"Error"`.
+  securitySchemes:
+    k6ApiToken:
+      type: http
+      scheme: bearer
+      description: |-
+        Token-based authentication using a k6 Personal API token or
+        Grafana Stack API token. Same scheme as the v6 API.
