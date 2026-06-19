@@ -30,11 +30,34 @@ type frontmatter struct {
 	Aliases     []string `yaml:"aliases"`
 }
 
+// BuildOption configures optional behaviour of Build.
+type BuildOption func(*buildConfig)
+
+type buildConfig struct {
+	extraSections func(afs docs.FS, markdownDir string) ([]docs.Section, error)
+}
+
+// WithExtraSections registers a generator invoked after the k6-docs tree is
+// walked and before parent/child relationships are populated. It writes any
+// additional markdown under the bundle's markdown directory and returns the
+// sections describing it. This lets cmd/prepare inject the generated
+// cloud-rest-api section without internal/bundle importing the OpenAPI
+// generator, which keeps that generator's embedded specs out of the
+// extension binary.
+func WithExtraSections(fn func(afs docs.FS, markdownDir string) ([]docs.Section, error)) BuildOption {
+	return func(c *buildConfig) { c.extraSections = fn }
+}
+
 // Build transforms the k6-docs working tree at k6DocsPath into a bundle
 // (sections.json + markdown/) under outputDir, for the given version. The
 // version may be exact ("v1.6.1") or wildcard ("v1.6.x", "next"); it is mapped
 // to the wildcard directory form for the source lookup.
-func Build(k6Version, k6DocsPath, outputDir string, afs docs.FS, _ io.Writer) error {
+func Build(k6Version, k6DocsPath, outputDir string, afs docs.FS, _ io.Writer, opts ...BuildOption) error {
+	var cfg buildConfig
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
 	// The k6-docs repo uses wildcard directories (e.g. "v1.6.x"), so convert
 	// exact versions like "v1.6.1" to the wildcard form for the path lookup.
 	docsVersion := docs.VersionWildcard(k6Version)
@@ -54,6 +77,14 @@ func Build(k6Version, k6DocsPath, outputDir string, afs docs.FS, _ io.Writer) er
 	sections, err := walkAndProcess(afs, versionRoot, markdownDir, sharedContent, filepath.ToSlash(sharedRel))
 	if err != nil {
 		return fmt.Errorf("walk docs: %w", err)
+	}
+
+	if cfg.extraSections != nil {
+		extra, err := cfg.extraSections(afs, markdownDir)
+		if err != nil {
+			return fmt.Errorf("generate extra sections: %w", err)
+		}
+		sections = append(sections, extra...)
 	}
 
 	populateChildren(sections)
