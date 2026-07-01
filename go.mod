@@ -13,7 +13,7 @@ require (
 	github.com/muesli/termenv v0.16.0
 	github.com/rogpeppe/go-internal v1.14.1
 	github.com/spf13/cobra v1.10.2
-	golang.org/x/term v0.43.0
+	golang.org/x/term v0.44.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -131,7 +131,7 @@ require (
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20260413170323-a8e9237a216b // indirect
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.44.0 // indirect
