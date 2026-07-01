@@ -6,16 +6,20 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"flag"
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"path/filepath"
+	"time"
 
 	git "github.com/go-git/go-git/v5"
 	docs "github.com/grafana/xk6-docs/docs"
 	"github.com/grafana/xk6-docs/internal/bundle"
+	"github.com/grafana/xk6-docs/internal/bundle/restdoc"
 )
 
 func main() {
@@ -37,14 +41,14 @@ func main() {
 	}
 
 	afs := bundle.NewOSFS()
-	if err := run(k6Version, k6DocsPath, outputDir, afs, log.Writer()); err != nil {
+	if err := run(k6Version, k6DocsPath, outputDir, http.DefaultClient, afs, log.Writer()); err != nil {
 		log.Fatal(err)
 	}
 }
 
 func run(
 	k6Version, k6DocsPath, outputDir string,
-	afs docs.FS, stderr io.Writer,
+	httpClient *http.Client, afs docs.FS, stderr io.Writer,
 ) error {
 	// Ensure we have the k6-docs repo (cloned to a temp dir if no path given).
 	docsPath, cleanup, err := ensureDocsRepo(k6DocsPath, defaultRepoURL, afs, stderr)
@@ -55,7 +59,15 @@ func run(
 		defer cleanup()
 	}
 
-	if err := bundle.Build(k6Version, docsPath, outputDir, afs, stderr); err != nil {
+	// Fetch the latest v6 OpenAPI spec at build time, validating it before use.
+	// Fall back to the spec embedded in restdoc on any problem so a build never
+	// fails or ships an empty section because of a transient or bad response.
+	restSections := func(fsys docs.FS, markdownDir string) ([]docs.Section, error) {
+		return restdoc.Generate(fsys, markdownDir, fetchV6Override(httpClient, stderr))
+	}
+
+	if err := bundle.Build(k6Version, docsPath, outputDir, afs, stderr,
+		bundle.WithExtraSections(restSections)); err != nil {
 		return err
 	}
 
@@ -64,6 +76,62 @@ func run(
 }
 
 const defaultRepoURL = "https://github.com/grafana/k6-docs.git"
+
+// defaultV6SpecURL is the live Grafana Cloud k6 v6 OpenAPI document, fetched
+// at build time so each bundle bakes a current snapshot.
+const defaultV6SpecURL = "https://api.k6.io/cloud/v6/openapi"
+
+// fetchV6SpecTimeout bounds the build-time fetch so a slow or unreachable
+// endpoint falls back to the embedded spec quickly.
+const fetchV6SpecTimeout = 10 * time.Second
+
+// fetchV6Spec downloads the live v6 OpenAPI document from defaultV6SpecURL
+// using the given client. The bytes may be JSON or YAML; restdoc parses
+// either. Returns an error on any transport failure or non-200 response so
+// the caller can fall back to the embedded spec.
+func fetchV6Spec(client *http.Client) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), fetchV6SpecTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, defaultV6SpecURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Do(req) //nolint:gosec // build-time GET of a fixed, trusted URL
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status %s", resp.Status)
+	}
+	return io.ReadAll(resp.Body)
+}
+
+// fetchV6Override returns a freshly fetched v6 OpenAPI spec for
+// restdoc.Generate, or nil to use the embedded copy. It fetches, then requires
+// the bytes to parse and contain at least one operation; any failure
+// (transport, non-200, parse error, or empty spec) logs a warning and returns
+// nil so the build falls back to the embedded spec rather than failing or
+// shipping an empty section.
+func fetchV6Override(client *http.Client, stderr io.Writer) []byte {
+	body, err := fetchV6Spec(client)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "warning: fetch v6 spec: %v; using embedded copy\n", err)
+		return nil
+	}
+	spec, err := restdoc.LoadSpecFromBytes(body)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "warning: fetched v6 spec did not parse: %v; using embedded copy\n", err)
+		return nil
+	}
+	if len(spec.Operations) == 0 {
+		_, _ = fmt.Fprintln(stderr, "warning: fetched v6 spec had no operations; using embedded copy")
+		return nil
+	}
+	return body
+}
 
 // ensureDocsRepo returns the path to the k6-docs repo. If k6DocsPath is empty,
 // it clones from repoURL into a temp directory and returns a cleanup function.

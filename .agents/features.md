@@ -153,3 +153,11 @@ Every user-observable behavior of the `k6 x docs` CLI.
 114. Shell completion does not reflect `--source` (uses the normal version cache)
 115. Rebuild is skipped when the source's markdown files are unchanged since the last build (stamp of path/size/mtime)
 116. A rebuild prints `Building k6 <version> docs from <path>...` on stderr; a skipped (unchanged) run prints nothing
+
+## Cloud REST API reference (`cloud-rest-api/`)
+
+117. `k6 x docs cloud-rest-api` browses the Grafana Cloud k6 REST API reference (v5 + v6) like any other docs section
+118. Each endpoint is a page at `cloud-rest-api/<v5|v6>/<operationId>` rendering auth, parameters, request/response schemas, and a curl example
+119. The reference is searchable (`k6 x docs search`) and shell-completable like other topics
+120. Content is baked into the bundle at build time and served offline (no runtime network); the v6 snapshot refreshes when bundles rebuild, v5 is static
+121. Not produced under `--source`
