@@ -8,23 +8,26 @@ import (
 
 func (idx *Index) ensureMaps() {
 	idx.initOnce.Do(func() {
+		// Keys are lower-cased so lookups are case-insensitive, matching
+		// slugs that contain uppercase letters (e.g. jslib method names).
 		bySlug := make(map[string]*Section, len(idx.Sections))
 		for i := range idx.Sections {
-			bySlug[idx.Sections[i].Slug] = &idx.Sections[i]
+			bySlug[strings.ToLower(idx.Sections[i].Slug)] = &idx.Sections[i]
 		}
 
 		byAlias := make(map[string]*Section)
 		for i := range idx.Sections {
 			sec := &idx.Sections[i]
 			for _, a := range sec.Aliases {
+				key := strings.ToLower(a)
 				// Exact slug always wins over alias.
-				if _, taken := bySlug[a]; taken {
+				if _, taken := bySlug[key]; taken {
 					continue
 				}
-				if _, dup := byAlias[a]; dup {
+				if _, dup := byAlias[key]; dup {
 					continue
 				}
-				byAlias[a] = sec
+				byAlias[key] = sec
 			}
 		}
 
@@ -52,13 +55,13 @@ func (idx *Index) Lookup(slug string) (*Section, bool) {
 // Returns nil if slug is unknown.
 func (idx *Index) Children(slug string) []*Section {
 	idx.ensureMaps()
-	parent, ok := idx.bySlug[slug]
+	parent, ok := idx.bySlug[strings.ToLower(slug)]
 	if !ok {
 		return nil
 	}
 	out := make([]*Section, 0, len(parent.Children))
 	for _, child := range parent.Children {
-		if c, ok := idx.bySlug[child]; ok {
+		if c, ok := idx.bySlug[strings.ToLower(child)]; ok {
 			out = append(out, c)
 		}
 	}
@@ -167,7 +170,7 @@ func (idx *Index) Tree(rootSlug string, depth int) iter.Seq2[int, *Tree] {
 			roots = idx.TopLevel()
 		} else {
 			idx.ensureMaps()
-			if _, ok := idx.bySlug[rootSlug]; !ok {
+			if _, ok := idx.bySlug[strings.ToLower(rootSlug)]; !ok {
 				return
 			}
 			roots = idx.Children(rootSlug)
