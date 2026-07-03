@@ -31,21 +31,20 @@ const defaultDepth = 1
 // It captures rt and dispatches to inner functions with specific values.
 func NewCommand(rt *Runtime) *cobra.Command {
 	var opts docsOpts
-	var agentHandled bool
 
-	cmd := buildDocsCmd(rt, &opts, &agentHandled)
+	cmd := buildDocsCmd(rt, &opts)
 	completionTopics := buildCompletionTopics(rt, &opts)
 	cmd.ValidArgsFunction = completionTopics
 
 	registerFlags(cmd, &opts)
-	cmd.AddCommand(buildSearchCmd(rt, &opts, &agentHandled, completionTopics))
+	cmd.AddCommand(buildSearchCmd(rt, &opts, completionTopics))
 	cmd.AddCommand(buildSkillCmd(rt))
-	setHelpFunc(cmd, rt, &opts)
+	setHelpFunc(cmd)
 
 	return cmd
 }
 
-func buildDocsCmd(rt *Runtime, opts *docsOpts, agentHandled *bool) *cobra.Command {
+func buildDocsCmd(rt *Runtime, opts *docsOpts) *cobra.Command {
 	withDocs := newWithDocs(rt, opts)
 
 	return &cobra.Command{
@@ -62,22 +61,7 @@ instead of downloading. With --source, --version defaults to "next" (the
 in-development docs); pass --version to target another version directory
 under docs/sources/k6/.`,
 		Args: cobra.ArbitraryArgs,
-		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			if rt.IsTTY || opts.pager {
-				return nil
-			}
-			env, err := setup(cmd.Context(), rt.Env, rt.Logf, rt.FS, opts.version, opts.source, opts.cacheDir)
-			if err != nil {
-				return err
-			}
-			printAgentGuide(cmd.OutOrStdout(), env.cacheDir)
-			*agentHandled = true
-			return nil
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if *agentHandled {
-				return nil
-			}
 			return withDocs(cmd, func(env *docsEnv, w io.Writer) error {
 				return showDocs(cmd.Context(), env, w, env.idx, args)
 			})
@@ -86,7 +70,7 @@ under docs/sources/k6/.`,
 }
 
 func buildSearchCmd(
-	rt *Runtime, opts *docsOpts, agentHandled *bool, completionTopics completionFunc,
+	rt *Runtime, opts *docsOpts, completionTopics completionFunc,
 ) *cobra.Command {
 	withDocs := newWithDocs(rt, opts)
 
@@ -96,9 +80,6 @@ func buildSearchCmd(
 		Long:  "Fuzzy search across all topics (case-insensitive, ignores punctuation).",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if *agentHandled {
-				return nil
-			}
 			return withDocs(cmd, func(env *docsEnv, w io.Writer) error {
 				printSearch(cmd.Context(), env, w, env.idx, args)
 				return nil
@@ -118,8 +99,7 @@ func buildSkillCmd(rt *Runtime) *cobra.Command {
 
 Without arguments, shows a table of supported agents and their skill directories.
 With a directory argument, installs the skill files there.`,
-		Args:              cobra.MaximumNArgs(1),
-		PersistentPreRunE: func(*cobra.Command, []string) error { return nil },
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runSkill(rt.FS, cmd.OutOrStdout(), rt.IsTTY, rt.BinaryPath, args)
 		},
@@ -157,15 +137,9 @@ func registerFlags(cmd *cobra.Command, opts *docsOpts) {
 	_ = cmd.RegisterFlagCompletionFunc("depth", cobra.NoFileCompletions)
 }
 
-func setHelpFunc(cmd *cobra.Command, rt *Runtime, opts *docsOpts) {
+func setHelpFunc(cmd *cobra.Command) {
 	defaultHelp := cmd.HelpFunc()
 	cmd.SetHelpFunc(func(c *cobra.Command, args []string) {
-		if !rt.IsTTY {
-			if env, err := setup(c.Context(), rt.Env, rt.Logf, rt.FS, opts.version, opts.source, opts.cacheDir); err == nil {
-				printAgentGuide(c.OutOrStdout(), env.cacheDir)
-				return
-			}
-		}
 		setHelpExample(c)
 		defaultHelp(c, args)
 	})

@@ -18,11 +18,10 @@ import (
 
 // docsEnv bundles the context needed for reading and transforming docs.
 type docsEnv struct {
-	cat      *docs.Catalog
-	idx      *docs.Index
-	version  string
-	depth    int
-	cacheDir string // resolved version dir path for agent guide
+	cat     *docs.Catalog
+	idx     *docs.Index
+	version string
+	depth   int
 }
 
 func (env *docsEnv) readAndTransform(ctx context.Context, slug string) string {
@@ -91,7 +90,7 @@ func setup(
 		return nil, fmt.Errorf("load index: %w", err)
 	}
 
-	return &docsEnv{cat: cat, idx: idx, version: version, cacheDir: filepath.Join(base, version)}, nil
+	return &docsEnv{cat: cat, idx: idx, version: version}, nil
 }
 
 func catalogOpts(env map[string]string, base string, localOnly bool) []docs.Option {

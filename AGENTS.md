@@ -14,7 +14,7 @@
 `k6 x docs` — offline k6 documentation in the terminal. For humans and AI agents. Docs are not embedded in the binary. On first run, the extension detects the k6 version from build info, downloads a matching compressed doc bundle (`.tar.zst`) from GitHub releases, and caches it locally (`~/.local/share/k6/docs/{version}/`). Subsequent runs serve from cache with no network. Cached bundles are checked for staleness every 24 hours via ETag comparison; stale bundles are re-downloaded automatically. A separate standalone prepare tool (`cmd/prepare/`) builds these bundles by cloning the k6-docs Hugo repository, transforming markdown into CLI-friendly format, building a searchable index (`sections.json`), and compressing everything. CI auto-publishes bundles as assets under a single `doc-bundles` GitHub release.
 
 ## Browsing
-- **Non-TTY** (agent mode): all commands print the same agent guide — the `markdown/` directory path and navigation recipes (from embedded SKILL.md with `<dir>` replaced). Agents read docs directly from the filesystem. Args are ignored.
+- **Non-TTY** (agents, pipes): serves the same content as TTY, as plain markdown with no ANSI styling and no pager. Args resolve to topics and search works identically, so agents run `k6 x docs`, `k6 x docs <topic>`, and `k6 x docs search <query>` and read the printed output directly. No markdown-directory path or filesystem recipes are printed.
 - **TTY** (human mode):
   - `k6 x docs` with no args prints `# k6 {version}` header followed by a depth-controlled bullet tree of categories and their children (default depth: 1), and a blockquote example hint.
   - `k6 x docs http get` resolves args to a slug (case-insensitive) and prints the cached markdown content (trimmed). If the topic has children, a `---` separator and `**{path} subtopics:**` section is appended with a depth-controlled bullet tree of children, and a blockquote example hint using the slug path form (`k6 x docs {path}/<subtopic>`).
@@ -37,7 +37,7 @@
 - Parent-prefix fallback: `withParentFallback` in `resolve.go` retries `parent/child` as `parent/parent-child` when the original doesn't exist.
 
 ### Rendering
-- Built-in markdown rendering via `glamour` library (`render.go`). Automatically renders with ANSI styling when stdout is a TTY and color is enabled. Non-TTY output prints the agent guide (not raw markdown).
+- Built-in markdown rendering via `glamour` library (`render.go`). Automatically renders with ANSI styling when stdout is a TTY and color is enabled. Non-TTY output prints plain markdown (the same content, no ANSI styling).
 - `--depth` flag (int, default 1) controls how many levels of subtopics are shown in TOC and section footers. `printTree` is the single recursive function used everywhere.
 - Links to the current version's online docs are stripped: `[text](https://grafana.com/docs/k6/v1.6.1/foo)` → `text`.
 - Stripped: Shared shortcodes (`{{< docs/shared >}}`), code tags (`{{< code >}}`), section tags (`{{< section >}}`), React/MDX component tags (`<Glossary>`), `<br/>`, internal doc links, image links, remaining markdown links, HTML comments, YAML frontmatter.
