@@ -1,7 +1,7 @@
-# Non-TTY mode: prints agent guide, not content.
+# Non-TTY mode: raw markdown content, not the old agent guide.
 exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a fn-one
-stdout '# k6 docs'
-! stdout 'modA.fnOne'
+stdout '## modA.fnOne'
+! stdout '# k6 docs'
 
 # TTY + NO_COLOR: raw markdown without glamour rendering.
 env NO_COLOR=1

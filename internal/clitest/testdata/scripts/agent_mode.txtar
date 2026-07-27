@@ -1,18 +1,17 @@
-# Non-TTY always prints the agent guide with recipes.
+# Non-TTY serves the same content as TTY, just without ANSI styling.
 
-# No args
+# No args — table of contents, not the old markdown-dir guide.
 exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x
-stdout '# k6 docs'
-stdout $WORK'/cache/v0.55.x/markdown'
-stdout 'grep -rl'
-stdout '_index.md'
+stdout '# k6 v0.55.x'
+! stdout 'Recipes'
+! stdout 'directory of markdown files'
 
-# With topic args — still prints guide, not content
+# Topic args — topic content.
 exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x mod-a fn-one
-stdout '# k6 docs'
-! stdout 'modA.fnOne'
+stdout 'modA.fnOne'
+! stdout '# k6 docs'
 
-# Search — still prints guide, not results
+# Search — results.
 exec ./k6 x docs --cache-dir $WORK/cache --version v0.55.x search k6
-stdout '# k6 docs'
-! stdout 'k6-mod-a'
+stdout 'k6-mod-a'
+! stdout '# k6 docs'
