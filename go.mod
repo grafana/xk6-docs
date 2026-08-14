@@ -2,7 +2,7 @@ module github.com/grafana/xk6-docs
 
 go 1.25.0
 
-toolchain go1.25.12
+toolchain go1.26.6
 
 require (
 	github.com/charmbracelet/glamour v1.0.0
