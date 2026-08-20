@@ -4,15 +4,18 @@ Past incidents and lessons learned from xk6-docs releases.
 
 ## Burned Go module proxy versions
 
-The Go module proxy caches versions permanently. Tags were moved multiple times before this was understood, leaving the proxy with stale code for v0.0.1 through v0.0.4. These versions cannot be fixed.
+The Go module proxy caches versions permanently. A deleted tag stays in the proxy, so its version number can never be reused. These versions cannot be fixed.
 
 | Version | Proxy commit | Git tag commit | Problem |
 |---------|-------------|----------------|---------|
 | v0.0.1 | `4b46c43` (Rename agent skill) | `4844c3d` (Fix tests after category changes) | Only 7 of 13 categories in hardcoded list. `set-up`, `release-notes`, `get-started`, `extensions`, `k6-studio`, `grafana-cloud-k6` all return "topic not found." |
 | v0.0.2 | `90963ec` (Remove --all and --list) | deleted | Before categories fix. Same bug as v0.0.1. |
 | v0.0.4 | `2a9139f` (Fix release workflow) | never tagged locally | Before categories fix. Same bug as v0.0.1. |
+| v0.0.11 | `33dbecb` (Update k6-ci to v0.4.0) | deleted | Tagged and released on 2026-08-19, then cancelled. The code is fine, but the number is spent. |
 
 v0.0.3 was never cached by the proxy.
+
+`git tag` is not the authority on which numbers are free. After v0.0.11 was deleted, `git tag --sort=-v:refname | head -1` returns v0.0.10, so incrementing the patch points straight back at the burned v0.0.11. Ask the proxy instead, as the release skill pre-flight now does.
 
 v0.0.5 is the first clean version. It was tagged after commit `12b54ac` which removed the hardcoded category list entirely — categories are now derived from the bundle's `sections.json` at runtime.
 
