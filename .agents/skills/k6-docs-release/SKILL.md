@@ -15,7 +15,12 @@ When any step fails (Slack, GitHub API, proxy check, etc.), retry up to 5 times 
 
 1. All tests and lint must pass locally before pushing.
 2. Determine the next version: check `git tag --sort=-v:refname | head -1` and increment the patch.
-3. Collect commits since last tag: `git log <last-tag>..HEAD --oneline`.
+3. Confirm the proxy has never seen that version:
+
+        go list -m github.com/grafana/xk6-docs@v<VERSION>
+
+   It must fail with `invalid version`. If it prints a version, that number is burned — the proxy served it once and keeps it forever, even though no tag and no release remain. Increment again and check the new number the same way. `git tag` cannot tell you this, because a deleted tag leaves no trace in git. See the burned-versions table in `history.md`.
+4. Collect commits since last tag: `git log <last-tag>..HEAD --oneline`.
 
 ## Step 1: Push and tag
 
