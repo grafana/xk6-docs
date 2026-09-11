@@ -46,6 +46,11 @@
 - All internal doc links and remaining markdown links are stripped to plain text (URL removed).
 - Duplicate child names are deduplicated in search results.
 
+### Shared transform API
+- `docs.Transform(content, version, opts ...TransformOption)` accepts optional link formatting; its default still strips links, and the CLI continues to use that default until it updates its docs dependency.
+- `docs.WithLinkSlugs()` formats current-version k6 links as text followed by an inline slug and preserves other markdown links; custom options set exported `TransformOptions.FormatLink`.
+- This is a runtime transform; bundle generation and `mcp-k6` behavior remain unchanged, and existing bundles need no regeneration.
+
 ### Documentation version handling
 - Auto-detects k6 version from Go build info.
 - Maps to wildcard: `v1.5.0` → `v1.5.x`, `v1.6.0-rc.1` → `v1.6.x`.

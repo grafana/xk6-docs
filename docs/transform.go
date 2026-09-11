@@ -1,6 +1,7 @@
 package docs
 
 import (
+	"net/url"
 	"regexp"
 	"strings"
 )
@@ -22,7 +23,7 @@ var (
 	reImageLink = regexp.MustCompile(`!\[([^\]]*)\]\([^)]+\)`)
 	// reMarkdownLink matches markdown links: [text](url)
 	// The text portion allows one level of nested brackets for cases like [get(url, [params])](url).
-	reMarkdownLink = regexp.MustCompile(`\[((?:[^\[\]]|\[[^\]]*\])*)\]\([^)]+\)`)
+	reMarkdownLink = regexp.MustCompile(`\[((?:[^\[\]]|\[[^\]]*\])*)\]\(([^)]+)\)`)
 )
 
 // PrepareTransform resolves docs/shared shortcodes using the shared content
@@ -46,10 +47,46 @@ func PrepareTransform(content string, sharedContent map[string]string) string {
 	})
 }
 
+// TransformOption configures optional markdown transformations.
+type TransformOption func(*TransformOptions)
+
+// TransformOptions controls markdown link formatting.
+type TransformOptions struct {
+	// FormatLink renders a link from its text, target URL, and documentation version.
+	FormatLink func(text, target, version string) string
+}
+
+// WithLinkSlugs shows current-version doc links as text followed by an inline
+// slug and preserves other markdown links, including web links.
+func WithLinkSlugs() TransformOption {
+	return func(opts *TransformOptions) {
+		opts.FormatLink = func(text, target, version string) string {
+			link := "[" + text + "](" + target + ")"
+			u, err := url.Parse(target)
+			if err != nil || u.Host != "" && u.Host != "grafana.com" {
+				return link
+			}
+			rest, ok := strings.CutPrefix(u.Path, "/docs/k6/")
+			if !ok {
+				return link
+			}
+			linkVersion, slug, ok := strings.Cut(rest, "/")
+			if !ok || VersionWildcard(linkVersion) != VersionWildcard(version) {
+				return link
+			}
+			slug = strings.Trim(slug, "/")
+			if slug == "" {
+				return link
+			}
+			return text + " (`" + slug + "`)"
+		}
+	}
+}
+
 // Transform applies markdown cleanup to content. It handles all pure text
 // transforms (shortcode stripping, admonition conversion, link stripping,
 // frontmatter removal, whitespace normalization). The pipeline runs in a
-// fixed order:
+// fixed order (WithLinkSlugs opts into inline doc slugs and preserved web links):
 //  1. Strip code tags
 //  2. Convert admonitions to blockquotes
 //  3. Strip section tags
@@ -63,9 +100,15 @@ func PrepareTransform(content string, sharedContent map[string]string) string {
 //  7. Strip HTML comments
 //  8. Strip YAML frontmatter
 //  9. Normalize whitespace
-func Transform(content, version string) string {
+func Transform(content, version string, opts ...TransformOption) string {
 	if content == "" {
 		return ""
+	}
+	options := TransformOptions{
+		FormatLink: func(text, _, _ string) string { return text },
+	}
+	for _, opt := range opts {
+		opt(&options)
 	}
 
 	s := content
@@ -118,8 +161,11 @@ func Transform(content, version string) string {
 	// 7. Strip markdown image links, keeping alt text.
 	s = reImageLink.ReplaceAllString(s, "$1")
 
-	// 7a. Strip remaining markdown links, keeping link text.
-	s = reMarkdownLink.ReplaceAllString(s, "$1")
+	// 7a. Apply the selected link formatter.
+	s = reMarkdownLink.ReplaceAllStringFunc(s, func(link string) string {
+		m := reMarkdownLink.FindStringSubmatch(link)
+		return options.FormatLink(m[1], m[2], version)
+	})
 
 	// 8. Strip HTML comments.
 	s = reHTMLComment.ReplaceAllString(s, "")
