@@ -29,7 +29,7 @@ func (env *docsEnv) readAndTransform(ctx context.Context, slug string) string {
 	if err != nil {
 		return ""
 	}
-	return docs.Transform(string(data), env.version)
+	return docs.Transform(string(data), env.version, docs.WithLinkSlugs())
 }
 
 // setup resolves the version, ensures docs are cached, and loads the index.
@@ -180,7 +180,7 @@ func printBestPractices(ctx context.Context, env *docsEnv, w io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("read best practices: %w", err)
 	}
-	content := docs.Transform(string(data), env.version)
+	content := docs.Transform(string(data), env.version, docs.WithLinkSlugs())
 	_, _ = fmt.Fprint(w, content)
 	if !strings.HasSuffix(content, "\n") {
 		_, _ = fmt.Fprintln(w)

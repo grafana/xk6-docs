@@ -1,0 +1,45 @@
+# Internal links show a copyable slug; external links retain their URL.
+exec ./k6 x docs --cache-dir $WORK/links --version v1.6.x get-started write-your-first-test
+cmp stdout expected.md
+
+# TTY output, search navigation, and the best-practices page share the transform.
+env NO_COLOR=1
+ptyexec ./k6 x docs --cache-dir $WORK/links --version v1.6.x get-started write-your-first-test
+cp stdout tty.md
+containslines expected.md tty.md
+exec ./k6 x docs --cache-dir $WORK/links --version v1.6.x search get-started/write-your-first-test
+cmp stdout expected.md
+cp links/v1.6.x/markdown/first.md links/v1.6.x/best_practices.md
+exec ./k6 x docs --cache-dir $WORK/links --version v1.6.x best-practices
+cmp stdout expected.md
+
+# Local source previews keep links through bundle preparation too.
+mkdir src/docs/sources/k6/v1.6.x/get-started
+cp links/v1.6.x/markdown/first.md src/docs/sources/k6/v1.6.x/get-started/write-your-first-test.md
+cp links/v1.6.x/markdown/running.md src/docs/sources/k6/v1.6.x/get-started/running-k6.md
+cp index.md src/docs/sources/k6/v1.6.x/get-started/_index.md
+exec ./k6 x docs --cache-dir $WORK/source-cache --source $WORK/src --version v1.6.x get-started write-your-first-test
+cmp stdout expected.md
+
+-- links/v1.6.x/sections.json --
+{"version":"v1.6.x","sections":[{"slug":"get-started/write-your-first-test","rel_path":"first.md"},{"slug":"get-started/running-k6","rel_path":"running.md"}]}
+-- links/v1.6.x/markdown/first.md --
+Refer to [Running k6](https://grafana.com/docs/k6/<K6_VERSION>/get-started/running-k6/) to learn how to execute your script.
+Use [Visual Studio Code](https://code.visualstudio.com/) to edit it.
+See [details](https://grafana.com/docs/k6/v1.6.1/get-started/running-k6/#results) and [root-relative](/docs/k6/<K6_VERSION>/get-started/running-k6).
+Keep [older docs](https://grafana.com/docs/k6/v1.5.x/get-started/running-k6/), [other docs](https://grafana.com/docs/grafana-cloud/testing/k6/), and [another host](https://example.com/docs/k6/v1.6.x/get-started/running-k6/).
+Keep [section](#results), [docs home](https://grafana.com/docs/k6/<K6_VERSION>/), and [web parentheses](https://en.wikipedia.org/wiki/HAR_(file_format)).
+Image: ![diagram](https://example.com/diagram.png).
+-- links/v1.6.x/markdown/running.md --
+# Running k6
+-- expected.md --
+Refer to Running k6 (`get-started/running-k6`) to learn how to execute your script.
+Use [Visual Studio Code](https://code.visualstudio.com/) to edit it.
+See details (`get-started/running-k6`) and root-relative (`get-started/running-k6`).
+Keep [older docs](https://grafana.com/docs/k6/v1.5.x/get-started/running-k6/), [other docs](https://grafana.com/docs/grafana-cloud/testing/k6/), and [another host](https://example.com/docs/k6/v1.6.x/get-started/running-k6/).
+Keep [section](#results), [docs home](https://grafana.com/docs/k6/v1.6.x/), and [web parentheses](https://en.wikipedia.org/wiki/HAR_(file_format)).
+Image: diagram.
+-- index.md --
+---
+title: Get started
+---

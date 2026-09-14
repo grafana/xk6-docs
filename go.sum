@@ -159,8 +159,8 @@ github.com/grafana/sobek-webapi-encoding v0.1.0 h1:2qf2pUiI6j33vl2etSE0Id4mfSQ4J
 github.com/grafana/sobek-webapi-encoding v0.1.0/go.mod h1:IegnWm83cyZ8qTnfL6Rivmx7dpMVE+w3CblopwfL/go=
 github.com/grafana/xk6-dashboard-assets v0.1.2 h1:n2wqytPICn2ZYsKa9HE6GlvFXk+WjByMfT4eM+ms3gE=
 github.com/grafana/xk6-dashboard-assets v0.1.2/go.mod h1:SeoRjvmFF8UhLIFDfvjqqwBtE8MtaIPYIDWqVJZEHDo=
-github.com/grafana/xk6-docs/docs v0.1.0 h1:2f9S1qF/VeF9kG+tcLGrI6UMkoQRSSSj45GkDeJX80E=
-github.com/grafana/xk6-docs/docs v0.1.0/go.mod h1:IBgZ0BW2xy2hhKaI+pGd/n4Gvi4FfUdR0/YQAVmKYUU=
+github.com/grafana/xk6-docs/docs v0.2.0 h1:/IIGby8JmG5rVy3emz+BxKH6P50klacZLrU4Rug6oe0=
+github.com/grafana/xk6-docs/docs v0.2.0/go.mod h1:6Vi1nQJjNX57ZNWPsFq7TALQyy1aPCeR+Ep2eo0jZow=
 github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 h1:UH//fgunKIs4JdUbpDl1VZCDaL56wXCB/5+wF6uHfaI=
 github.com/grpc-ecosystem/go-grpc-middleware v1.4.0/go.mod h1:g5qyo/la0ALbONm6Vbp88Yd8NsDy6rZz+RcrMPxvld8=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 h1:5VipnvEpbqr2gA2VbM+nYVbkIF28c5ZQfqCBQ5g2xfk=

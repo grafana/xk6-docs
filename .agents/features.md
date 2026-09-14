@@ -115,7 +115,7 @@ Every user-observable behavior of the `k6 x docs` CLI.
 88. Strips remaining Hugo shortcodes (youtube, card-grid, collapse, hero-simple)
 89. Collapse content preserved (only tags stripped)
 90. Replaces `<K6_VERSION>` with actual version
-91. Strips markdown links to plain text
+91. The CLI opts into shared `docs.Transform` link formatting with `WithLinkSlugs()`: current-version Grafana k6 doc slugs appear in parentheses and backticks after the link text; supports absolute and `/docs/k6/` URLs, matches patch versions to their wildcard version, and drops query strings/fragments from slugs; other markdown links retain their URLs; default shared behavior, existing bundles, and `mcp-k6` remain unchanged; custom options can set exported `TransformOptions.FormatLink`
 92. Strips markdown images to alt text
 93. Strips HTML comments
 94. Strips PascalCase component tags (`<Glossary>`, `<DescriptionList>`, etc.)
