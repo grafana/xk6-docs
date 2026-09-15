@@ -8,7 +8,7 @@ LINT_CONFIG ?= .golangci.yml
 LINT_PATCH ?= .golangci.patch
 LINT_CONFIG_URL := https://raw.githubusercontent.com/grafana/k6-ci/$(K6_CI_REF)/.golangci.yml
 
-.PHONY: help lint clean-lint test test-gh build prepare
+.PHONY: help lint lint-docs clean-lint test test-gh build prepare
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-15s %s\n", $$1, $$2}'
@@ -23,9 +23,12 @@ $(LINT_CONFIG): $(LINT_BASE) $(LINT_PATCH)
 lint: $(LINT_CONFIG) ## Run linters
 	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$$(head -n1 $(LINT_BASE) | tr -d '# ') \
 	  run --config=$(LINT_CONFIG) ./...
+	$(MAKE) lint-docs
+	xk6 lint --preset official
+
+lint-docs: $(LINT_CONFIG)
 	cd docs && go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$$(head -n1 ../$(LINT_BASE) | tr -d '# ') \
 	  run --config=../$(LINT_CONFIG) ./...
-	xk6 lint --preset official
 
 clean-lint: ## Remove generated lint configuration
 	rm -f $(LINT_BASE) $(LINT_CONFIG)
