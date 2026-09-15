@@ -357,7 +357,7 @@ func fetchRemoteVersions(ctx context.Context, client *http.Client) []string {
 		return nil
 	}
 
-	resp, err := client.Do(req) //nolint:gosec // releasesURL is a constant.
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil
 	}
