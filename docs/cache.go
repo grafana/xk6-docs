@@ -261,7 +261,7 @@ func doRequest(ctx context.Context, client *http.Client, method, reqURL string) 
 	if err != nil {
 		return nil, err
 	}
-	return client.Do(req) //nolint:gosec // URL built by bundleURL with validated version.
+	return client.Do(req)
 }
 
 // bundleURL returns the download URL for a docs bundle.

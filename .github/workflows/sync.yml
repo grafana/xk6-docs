@@ -14,9 +14,13 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - name: Resolve Go versions
+        id: go-versions
+        uses: grafana/k6-ci/.github/actions/go-versions@41aaf8e365b56fd120b0396beae2eba3969babab # v0.5.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
+          go-version: ${{ steps.go-versions.outputs.current }}
+          cache: false
       - name: Find versions to build
         id: check
         env:
