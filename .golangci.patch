@@ -1,0 +1,11 @@
+diff --git a/.golangci.yml b/.golangci.yml
+--- a/.golangci.yml
++++ b/.golangci.yml
+@@ -94,6 +94,7 @@ linters:
+           - canonicalheader
+           - cyclop
+           - dupl
++          - forbidigo
+           - forcetypeassert
+           - funlen
+           - gocognit

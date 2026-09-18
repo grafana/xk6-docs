@@ -97,7 +97,7 @@ func fetchV6Spec(client *http.Client) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp, err := client.Do(req) //nolint:gosec // build-time GET of a fixed, trusted URL
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
