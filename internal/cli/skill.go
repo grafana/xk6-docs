@@ -67,15 +67,16 @@ type agentEntry struct {
 }
 
 func supportedAgents() []agentEntry {
+	const agentSkillsDir = "~/.agents/skills/"
 	return []agentEntry{
 		{"Claude Code", "~/.claude/skills/"},
-		{"Cursor", "~/.agents/skills/"},
-		{"Codex", "~/.agents/skills/"},
-		{"Gemini CLI", "~/.agents/skills/"},
-		{"GitHub Copilot", "~/.agents/skills/"},
-		{"Amp", "~/.agents/skills/"},
-		{"Cline", "~/.agents/skills/"},
-		{"OpenCode", "~/.agents/skills/"},
+		{"Cursor", agentSkillsDir},
+		{"Codex", agentSkillsDir},
+		{"Gemini CLI", agentSkillsDir},
+		{"GitHub Copilot", agentSkillsDir},
+		{"Amp", agentSkillsDir},
+		{"Cline", agentSkillsDir},
+		{"OpenCode", agentSkillsDir},
 		{"Windsurf", "~/.codeium/windsurf/skills/"},
 		{"Roo Code", "~/.roo/skills/"},
 		{"Goose", "~/.config/goose/skills/"},
